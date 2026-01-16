@@ -1,0 +1,194 @@
+"""Utility functions for Network Analytics Toolkit."""
+
+import os
+import re
+import sys
+import subprocess
+from ipaddress import ip_address, ip_network, IPv4Address, IPv4Network
+from pathlib import Path
+from typing import Callable
+
+import psutil
+
+from .config import get_config
+from .exceptions import PermissionError, ValidationError
+
+
+def is_root() -> bool:
+    """Check if running with root/admin privileges."""
+    return os.geteuid() == 0
+
+
+def require_root(operation: str) -> Callable:
+    """Decorator to require root privileges for an operation."""
+
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            if not is_root():
+                raise PermissionError(
+                    operation,
+                    "Run with sudo or use pkexec for GUI elevation",
+                )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def elevate_privileges() -> bool:
+    """Attempt to elevate privileges using sudo or pkexec."""
+    if is_root():
+        return True
+
+    # Try pkexec first (GUI-friendly)
+    if subprocess.run(["which", "pkexec"], capture_output=True).returncode == 0:
+        try:
+            subprocess.run(
+                ["pkexec", sys.executable] + sys.argv,
+                check=True,
+            )
+            return True
+        except subprocess.CalledProcessError:
+            pass
+
+    # Fall back to sudo
+    try:
+        subprocess.run(
+            ["sudo", sys.executable] + sys.argv,
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def validate_ip(ip_str: str) -> IPv4Address:
+    """Validate and parse an IP address string."""
+    try:
+        return ip_address(ip_str)
+    except ValueError as e:
+        raise ValidationError(f"Invalid IP address: {ip_str}", str(e))
+
+
+def validate_network(network_str: str) -> IPv4Network:
+    """Validate and parse a network CIDR string."""
+    try:
+        return ip_network(network_str, strict=False)
+    except ValueError as e:
+        raise ValidationError(f"Invalid network: {network_str}", str(e))
+
+
+def validate_port_range(port_range: str) -> list[int]:
+    """Parse and validate a port range string (e.g., '1-1000' or '22,80,443')."""
+    ports = []
+
+    for part in port_range.split(","):
+        part = part.strip()
+        if "-" in part:
+            match = re.match(r"^(\d+)-(\d+)$", part)
+            if not match:
+                raise ValidationError(f"Invalid port range format: {part}")
+            start, end = int(match.group(1)), int(match.group(2))
+            if not (1 <= start <= 65535 and 1 <= end <= 65535):
+                raise ValidationError(f"Port numbers must be 1-65535: {part}")
+            if start > end:
+                raise ValidationError(f"Invalid range (start > end): {part}")
+            ports.extend(range(start, end + 1))
+        else:
+            port = int(part)
+            if not 1 <= port <= 65535:
+                raise ValidationError(f"Port number must be 1-65535: {port}")
+            ports.append(port)
+
+    return sorted(set(ports))
+
+
+def get_interfaces() -> dict[str, dict]:
+    """Get available network interfaces with their addresses."""
+    interfaces = {}
+
+    for name, addrs in psutil.net_if_addrs().items():
+        interface_info = {"ipv4": None, "ipv6": None, "mac": None}
+
+        for addr in addrs:
+            if addr.family.name == "AF_INET":
+                interface_info["ipv4"] = addr.address
+                interface_info["netmask"] = addr.netmask
+            elif addr.family.name == "AF_INET6":
+                interface_info["ipv6"] = addr.address
+            elif addr.family.name == "AF_PACKET" or addr.family.name == "AF_LINK":
+                interface_info["mac"] = addr.address
+
+        # Get interface stats
+        stats = psutil.net_if_stats().get(name)
+        if stats:
+            interface_info["is_up"] = stats.isup
+            interface_info["speed"] = stats.speed
+            interface_info["mtu"] = stats.mtu
+
+        interfaces[name] = interface_info
+
+    return interfaces
+
+
+def get_default_interface() -> str | None:
+    """Get the default network interface (one with a gateway)."""
+    gateways = psutil.net_if_stats()
+    interfaces = get_interfaces()
+
+    # Find first interface that is up and has an IPv4 address
+    for name, info in interfaces.items():
+        if info.get("is_up") and info.get("ipv4") and not name.startswith("lo"):
+            return name
+
+    return None
+
+
+def ensure_results_dir() -> Path:
+    """Ensure results directory exists and return its path."""
+    config = get_config()
+    config.results_dir.mkdir(parents=True, exist_ok=True)
+    return config.results_dir
+
+
+def format_mac(mac: str) -> str:
+    """Format MAC address consistently."""
+    mac = mac.replace("-", ":").lower()
+    parts = mac.split(":")
+    if len(parts) == 6:
+        return ":".join(p.zfill(2) for p in parts)
+    return mac
+
+
+def resolve_hostname(ip: str) -> str | None:
+    """Attempt to resolve IP to hostname."""
+    import socket
+
+    try:
+        return socket.gethostbyaddr(ip)[0]
+    except (socket.herror, socket.gaierror):
+        return None
+
+
+def check_dependency(name: str) -> bool:
+    """Check if an external command is available."""
+    return subprocess.run(["which", name], capture_output=True).returncode == 0
+
+
+def get_oui_vendor(mac: str) -> str | None:
+    """Look up vendor from MAC OUI (first 3 octets)."""
+    # Basic OUI lookup - in production, use a full OUI database
+    oui_map = {
+        "00:00:0c": "Cisco",
+        "00:1a:2b": "Hewlett-Packard",
+        "00:50:56": "VMware",
+        "08:00:27": "VirtualBox",
+        "52:54:00": "QEMU/KVM",
+        "dc:a6:32": "Raspberry Pi",
+        "b8:27:eb": "Raspberry Pi",
+    }
+
+    mac_normalized = format_mac(mac)
+    oui = mac_normalized[:8].lower()
+    return oui_map.get(oui)

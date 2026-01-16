@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "netanalytics": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "netanalytics_mcp.server"]
+    }
+  }
+}

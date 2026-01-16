@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netanalytics-mcp"
+version = "0.1.0"
+description = "MCP server exposing Network Analytics Toolkit via FastMCP"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Network Analytics Team"}
+]
+keywords = ["mcp", "network", "security", "fastmcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "fastmcp>=2.14.0,<3",
+    "netanalytics",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.3.0",
+]
+
+[project.scripts]
+netanalytics-mcp = "netanalytics_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["netanalytics_mcp"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.3.0",
+]

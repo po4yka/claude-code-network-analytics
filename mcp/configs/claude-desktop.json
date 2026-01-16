@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "netanalytics": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "netanalytics_mcp.server"],
+      "cwd": "${workspaceFolder}"
+    },
+    "nmap": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/nmap-mcp-server"],
+      "env": {
+        "NMAP_PATH": "/usr/bin/nmap"
+      }
+    },
+    "wiremcp": {
+      "command": "python",
+      "args": ["-m", "wiremcp"],
+      "env": {
+        "TSHARK_PATH": "/usr/bin/tshark"
+      }
+    },
+    "suricata": {
+      "command": "python",
+      "args": ["-m", "suricata_mcp"],
+      "env": {
+        "SURICATA_PATH": "/usr/bin/suricata"
+      }
+    }
+  }
+}
