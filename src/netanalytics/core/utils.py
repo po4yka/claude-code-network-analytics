@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import subprocess
+import socket
 from ipaddress import ip_address, ip_network, IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Callable
@@ -71,6 +72,19 @@ def validate_ip(ip_str: str) -> IPv4Address:
         raise ValidationError(f"Invalid IP address: {ip_str}", str(e))
 
 
+def resolve_target(target: str) -> str:
+    """Resolve a hostname or IP string to an IPv4 address string."""
+    try:
+        return str(validate_ip(target))
+    except ValidationError:
+        pass
+
+    try:
+        return socket.gethostbyname(target)
+    except socket.gaierror as e:
+        raise ValidationError(f"Invalid hostname or IP: {target}", str(e))
+
+
 def validate_network(network_str: str) -> IPv4Network:
     """Validate and parse a network CIDR string."""
     try:
@@ -89,14 +103,20 @@ def validate_port_range(port_range: str) -> list[int]:
             match = re.match(r"^(\d+)-(\d+)$", part)
             if not match:
                 raise ValidationError(f"Invalid port range format: {part}")
-            start, end = int(match.group(1)), int(match.group(2))
+            try:
+                start, end = int(match.group(1)), int(match.group(2))
+            except ValueError as e:
+                raise ValidationError(f"Invalid port range format: {part}", str(e))
             if not (1 <= start <= 65535 and 1 <= end <= 65535):
                 raise ValidationError(f"Port numbers must be 1-65535: {part}")
             if start > end:
                 raise ValidationError(f"Invalid range (start > end): {part}")
             ports.extend(range(start, end + 1))
         else:
-            port = int(part)
+            try:
+                port = int(part)
+            except ValueError as e:
+                raise ValidationError(f"Invalid port number: {part}", str(e))
             if not 1 <= port <= 65535:
                 raise ValidationError(f"Port number must be 1-65535: {port}")
             ports.append(port)

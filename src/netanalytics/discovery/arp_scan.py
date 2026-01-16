@@ -58,7 +58,11 @@ def arp_scan_single(ip: str, timeout: float = 2.0) -> ARPResult | None:
         return None
 
     for sent, received in answered:
-        response_time = (datetime.now() - start_time).total_seconds()
+        response_time = None
+        if hasattr(sent, "time") and hasattr(received, "time"):
+            response_time = float(received.time - sent.time)
+        if response_time is None:
+            response_time = (datetime.now() - start_time).total_seconds()
         mac = format_mac(received.hwsrc)
 
         return ARPResult(
@@ -67,7 +71,9 @@ def arp_scan_single(ip: str, timeout: float = 2.0) -> ARPResult | None:
             hostname=resolve_hostname(received.psrc),
             vendor=get_oui_vendor(mac),
             response_time=response_time,
-            timestamp=start_time,
+            timestamp=datetime.fromtimestamp(float(received.time))
+            if hasattr(received, "time")
+            else start_time,
         )
 
     return None
@@ -116,7 +122,11 @@ def arp_scan(
 
     results = []
     for sent, received in answered:
-        response_time = (datetime.now() - start_time).total_seconds()
+        response_time = None
+        if hasattr(sent, "time") and hasattr(received, "time"):
+            response_time = float(received.time - sent.time)
+        if response_time is None:
+            response_time = (datetime.now() - start_time).total_seconds()
         mac = format_mac(received.hwsrc)
 
         result = ARPResult(
@@ -125,7 +135,9 @@ def arp_scan(
             hostname=resolve_hostname(received.psrc),
             vendor=get_oui_vendor(mac),
             response_time=response_time,
-            timestamp=start_time,
+            timestamp=datetime.fromtimestamp(float(received.time))
+            if hasattr(received, "time")
+            else start_time,
         )
         results.append(result)
 

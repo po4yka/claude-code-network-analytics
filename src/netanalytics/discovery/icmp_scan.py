@@ -29,7 +29,7 @@ class ICMPResult:
             "is_alive": self.is_alive,
             "hostname": self.hostname,
             "ttl": self.ttl,
-            "rtt_ms": round(self.rtt * 1000, 2) if self.rtt else None,
+            "rtt_ms": round(self.rtt * 1000, 2) if self.rtt is not None else None,
             "timestamp": self.timestamp.isoformat(),
         }
 
@@ -132,14 +132,19 @@ def icmp_scan(
         if received.haslayer(ICMP):
             ip = received.src
             alive_ips.add(ip)
+            rtt = None
+            if hasattr(sent, "time") and hasattr(received, "time"):
+                rtt = float(received.time - sent.time)
             results.append(
                 ICMPResult(
                     ip=ip,
                     is_alive=True,
                     hostname=resolve_hostname(ip),
                     ttl=received.ttl,
-                    rtt=None,  # Can't calculate individual RTT in batch mode
-                    timestamp=timestamp,
+                    rtt=rtt,
+                    timestamp=datetime.fromtimestamp(float(received.time))
+                    if hasattr(received, "time")
+                    else timestamp,
                 )
             )
 

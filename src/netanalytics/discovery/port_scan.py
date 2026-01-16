@@ -9,7 +9,7 @@ from scapy.all import IP, TCP, sr1, conf
 
 from ..core.config import get_config
 from ..core.exceptions import ScanError, PermissionError
-from ..core.utils import is_root, validate_ip, validate_port_range
+from ..core.utils import is_root, resolve_target, validate_port_range
 
 
 class PortState(Enum):
@@ -38,7 +38,7 @@ class PortResult:
             "service": self.service,
             "banner": self.banner,
             "response_time_ms": round(self.response_time * 1000, 2)
-            if self.response_time
+            if self.response_time is not None
             else None,
         }
 
@@ -148,7 +148,7 @@ def syn_scan(
     timeout = timeout or config.scan.timeout
     rate_limit = rate_limit or config.scan.rate_limit
 
-    validate_ip(target)
+    target_ip = resolve_target(target)
     port_list = validate_port_range(ports)
     conf.verb = 0
 
@@ -158,7 +158,7 @@ def syn_scan(
     inter = 1.0 / rate_limit if rate_limit and not config.fast_mode else 0
 
     for port in port_list:
-        packet = IP(dst=target) / TCP(dport=port, flags="S")
+        packet = IP(dst=target_ip) / TCP(dport=port, flags="S")
         port_start = datetime.now()
 
         try:
@@ -184,7 +184,7 @@ def syn_scan(
             if tcp_flags == 0x12:  # SYN-ACK
                 state = PortState.OPEN
                 # Send RST to close connection
-                rst_packet = IP(dst=target) / TCP(dport=port, flags="R")
+                rst_packet = IP(dst=target_ip) / TCP(dport=port, flags="R")
                 sr1(rst_packet, timeout=0.5, verbose=False)
             elif tcp_flags == 0x14:  # RST-ACK
                 state = PortState.CLOSED
@@ -249,7 +249,7 @@ def connect_scan(
     timeout = timeout or config.scan.timeout
     rate_limit = rate_limit or config.scan.rate_limit
 
-    validate_ip(target)
+    target_ip = resolve_target(target)
     port_list = validate_port_range(ports)
 
     start_time = datetime.now()
@@ -263,7 +263,7 @@ def connect_scan(
         port_start = datetime.now()
 
         try:
-            result = sock.connect_ex((target, port))
+            result = sock.connect_ex((target_ip, port))
             response_time = (datetime.now() - port_start).total_seconds()
 
             if result == 0:

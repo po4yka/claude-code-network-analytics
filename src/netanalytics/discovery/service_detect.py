@@ -6,7 +6,7 @@ import socket
 import re
 
 from ..core.exceptions import ScanError
-from ..core.utils import validate_ip, validate_port_range
+from ..core.utils import resolve_target, validate_port_range
 
 
 @dataclass
@@ -181,9 +181,9 @@ def detect_service(ip: str, port: int, timeout: float = 5.0) -> ServiceInfo:
     Returns:
         ServiceInfo with detected service details
     """
-    validate_ip(ip)
+    resolved_ip = resolve_target(ip)
 
-    banner = _grab_banner(ip, port, timeout)
+    banner = _grab_banner(resolved_ip, port, timeout)
 
     if not banner:
         return ServiceInfo(
@@ -260,7 +260,7 @@ def detect_services(
     Returns:
         List of ServiceInfo for each port
     """
-    validate_ip(ip)
+    resolved_ip = resolve_target(ip)
 
     if isinstance(ports, str):
         port_list = validate_port_range(ports)
@@ -269,7 +269,7 @@ def detect_services(
 
     results = []
     for port in port_list:
-        result = detect_service(ip, port, timeout)
+        result = detect_service(resolved_ip, port, timeout)
         results.append(result)
 
     return results
