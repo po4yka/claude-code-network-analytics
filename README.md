@@ -21,6 +21,25 @@ uv sync
 pip install -e .
 ```
 
+## Prerequisites
+
+Some features require elevated privileges and external tools:
+
+- Root/sudo required for: ARP/ICMP discovery, SYN scans, packet capture.
+- External tools:
+  - `nmap` for advanced scanning (via python-nmap)
+  - `tshark` or `tcpdump` for deeper packet inspection workflows
+
+Install hints:
+
+- macOS (Homebrew):
+  - `brew install nmap wireshark`
+  - `brew install tcpdump` (usually preinstalled)
+- Ubuntu/Debian:
+  - `sudo apt install nmap tshark tcpdump`
+- Fedora:
+  - `sudo dnf install nmap wireshark-cli tcpdump`
+
 ## Quick Start
 
 ```bash
@@ -42,6 +61,38 @@ uv run netanalytics security 192.168.1.1 --level basic
 # Generate report
 uv run netanalytics report 192.168.1.1 --format html
 ```
+
+## Configuration
+
+The CLI reads configuration from `.netanalytics.json` in the current working
+directory by default. You can override the path with `NETANALYTICS_CONFIG`.
+
+Example:
+
+```bash
+export NETANALYTICS_CONFIG=/path/to/netanalytics.json
+```
+
+Key settings include `results_dir`, scan timeouts/rate limits, capture defaults,
+and topology visualization options. See `src/netanalytics/core/config.py` for
+the full schema.
+
+## Utilities
+
+The `scripts/` directory includes helper utilities:
+
+- `scripts/doctor.py`: environment checks (Python version, deps, external tools).
+  - Example: `python scripts/doctor.py`
+- `scripts/sample-data.py`: generate sample JSON outputs for demos/tests.
+  - Example: `python scripts/sample-data.py --target 192.168.1.1`
+- `scripts/bench.py`: benchmark scan throughput and latency.
+  - Example: `python scripts/bench.py --target 127.0.0.1 --ports 1-1024`
+- `scripts/report-batch.py`: batch report generation for multiple targets.
+  - Example: `python scripts/report-batch.py --targets 192.168.1.1,192.168.1.2 --format html`
+- `scripts/update-oui.py`: download and cache OUI vendor list.
+  - Example: `python scripts/update-oui.py --output results/oui_vendors.json`
+- `scripts/pcap-summarize.py`: quick pcap summary without full report.
+  - Example: `python scripts/pcap-summarize.py capture.pcap --protocol dns`
 
 ## MCP Server
 
