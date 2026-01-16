@@ -6,13 +6,13 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 from . import __version__
-from .core.config import get_config, set_config, Config
-from .core.utils import get_interfaces, get_default_interface, is_root
+from .core.config import get_config
+from .core.utils import get_default_interface, get_interfaces, is_root
 
 console = Console()
 
@@ -65,7 +65,7 @@ def discover(
     output: str | None,
 ) -> None:
     """Discover hosts on a network using ARP or ICMP scanning."""
-    from .discovery import arp_scan, icmp_scan
+    from .discovery import arp_scan
 
     if method == "arp" and not is_root():
         print_error("ARP scan requires root privileges. Run with sudo.")
@@ -124,6 +124,7 @@ def discover(
     # Save to file if requested
     if output:
         output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         data = {"network": network, "method": method, "hosts": [r.to_dict() for r in results]}
         with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
@@ -194,11 +195,18 @@ def scan(
         table.add_column("Banner", style="dim")
 
         for port in open_ports:
+            banner_display = "-"
+            if port.banner:
+                banner_display = (
+                    port.banner[:50] + "..."
+                    if len(port.banner) > 50
+                    else port.banner
+                )
             table.add_row(
                 str(port.port),
                 port.state.value,
                 port.service or "-",
-                (port.banner[:50] + "...") if port.banner and len(port.banner) > 50 else (port.banner or "-"),
+                banner_display,
             )
 
         console.print(table)
@@ -216,6 +224,7 @@ def scan(
 
     if output:
         output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(result.to_dict(), f, indent=2)
         print_success(f"Results saved to {output_path}")
@@ -248,7 +257,9 @@ def capture(
         print_error("No network interface specified and could not detect default.")
         sys.exit(1)
 
-    console.print(f"[bold]Capturing on {interface} (max {count} packets, {timeout}s timeout)...[/bold]")
+    console.print(
+        f"[bold]Capturing on {interface} (max {count} packets, {timeout}s timeout)...[/bold]"
+    )
     if bpf_filter:
         console.print(f"[dim]Filter: {bpf_filter}[/dim]")
 
@@ -297,6 +308,7 @@ def analyze(
 
         if output:
             output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w") as f:
                 json.dump(stats.to_dict(), f, indent=2)
             print_success(f"Results saved to {output_path}")
@@ -347,7 +359,10 @@ def topology(
             print_error(str(e))
             sys.exit(1)
 
-    console.print(f"[green]Discovered {graph.number_of_nodes()} nodes and {graph.number_of_edges()} connections[/green]")
+    console.print(
+        f"[green]Discovered {graph.number_of_nodes()} nodes "
+        f"and {graph.number_of_edges()} connections[/green]"
+    )
 
     if output or show:
         visualize_topology(graph, output_file=output, layout=layout, show=show)
@@ -389,6 +404,7 @@ def security(ctx: click.Context, target: str, level: str, output: str | None) ->
 
     if output:
         output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(result.to_dict(), f, indent=2)
         print_success(f"Results saved to {output_path}")

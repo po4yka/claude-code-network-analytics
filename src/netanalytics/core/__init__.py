@@ -2,21 +2,21 @@
 
 from .config import Config, get_config
 from .exceptions import (
-    NetAnalyticsError,
-    ScanError,
     CaptureError,
-    PermissionError,
+    NetAnalyticsError,
     NetworkError,
+    PermissionError,
+    ScanError,
     TimeoutError,
 )
 from .utils import (
+    ensure_results_dir,
+    get_interfaces,
     is_root,
     require_root,
     validate_ip,
     validate_network,
     validate_port_range,
-    get_interfaces,
-    ensure_results_dir,
 )
 
 __all__ = [

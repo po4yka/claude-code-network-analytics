@@ -6,8 +6,8 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from netanalytics.core.utils import is_root
 from netanalytics.core.config import get_config
+from netanalytics.core.utils import is_root
 from netanalytics.topology import build_topology, calculate_metrics, visualize_topology
 
 
@@ -28,14 +28,20 @@ def register_topology_tools(mcp: FastMCP) -> None:
         """
         if not network and not pcap_path:
             return {
-                "error": "Must provide either 'network' for live scan or 'pcap_path' for offline analysis",
+                "error": (
+                    "Must provide either 'network' for live scan "
+                    "or 'pcap_path' for offline analysis"
+                ),
                 "nodes": [],
                 "edges": [],
             }
 
         if network and not is_root():
             return {
-                "error": "Live topology discovery requires root privileges. Run with sudo or use pcap_path.",
+                "error": (
+                    "Live topology discovery requires root privileges. "
+                    "Run with sudo or use pcap_path."
+                ),
                 "requires_root": True,
                 "nodes": [],
                 "edges": [],
@@ -83,7 +89,9 @@ def register_topology_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def calculate_topology_metrics(
-        topology_data: Annotated[dict, "Topology data from build_network_topology (must have 'nodes' and 'edges')"],
+        topology_data: Annotated[
+            dict, "Topology data from build_network_topology (must have 'nodes' and 'edges')"
+        ],
     ) -> dict:
         """Calculate network topology metrics.
 
@@ -93,7 +101,10 @@ def register_topology_tools(mcp: FastMCP) -> None:
         Helps identify critical nodes, potential bottlenecks, and network segments.
         """
         if not topology_data.get("nodes") or not topology_data.get("edges"):
-            return {"error": "Invalid topology data. Must have 'nodes' and 'edges'.", "metrics": {}}
+            return {
+                "error": "Invalid topology data. Must have 'nodes' and 'edges'.",
+                "metrics": {},
+            }
 
         try:
             import networkx as nx
@@ -127,8 +138,12 @@ def register_topology_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def export_topology(
         topology_data: Annotated[dict, "Topology data from build_network_topology"],
-        format: Annotated[str, "Export format: 'graphml', 'gexf', 'json', or 'png' (default: json)"] = "json",
-        output_path: Annotated[str | None, "Output file path (auto-generated if not provided)"] = None,
+        format: Annotated[
+            str, "Export format: 'graphml', 'gexf', 'json', or 'png' (default: json)"
+        ] = "json",
+        output_path: Annotated[
+            str | None, "Output file path (auto-generated if not provided)"
+        ] = None,
     ) -> dict:
         """Export network topology to various formats.
 
@@ -182,7 +197,10 @@ def register_topology_tools(mcp: FastMCP) -> None:
             elif format == "png":
                 visualize_topology(graph, output_file=str(path), show=False)
             else:
-                return {"error": f"Unknown format: {format}. Use graphml, gexf, json, or png.", "path": None}
+                return {
+                    "error": f"Unknown format: {format}. Use graphml, gexf, json, or png.",
+                    "path": None,
+                }
 
             return {
                 "format": format,

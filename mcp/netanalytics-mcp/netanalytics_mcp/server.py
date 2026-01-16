@@ -7,17 +7,20 @@ topology mapping, and security assessment.
 
 from fastmcp import FastMCP
 
-from .tools.discovery import register_discovery_tools
-from .tools.traffic import register_traffic_tools
-from .tools.topology import register_topology_tools
-from .tools.security import register_security_tools
-from .tools.reporting import register_reporting_tools
 from .resources import register_resources
+from .tools.discovery import register_discovery_tools
+from .tools.reporting import register_reporting_tools
+from .tools.security import register_security_tools
+from .tools.topology import register_topology_tools
+from .tools.traffic import register_traffic_tools
 
 # Create the MCP server
 mcp = FastMCP(
     "netanalytics",
-    description="Network Analytics Toolkit - Discovery, scanning, traffic analysis, topology mapping, and security assessment",
+    description=(
+        "Network Analytics Toolkit - Discovery, scanning, traffic analysis, "
+        "topology mapping, and security assessment"
+    ),
 )
 
 # Register all tool modules

@@ -1,8 +1,8 @@
 """Topology analysis module - NetworkX graphs, visualization, metrics."""
 
-from .builder import build_topology, TopologyBuilder
-from .visualizer import visualize_topology, TopologyVisualizer
-from .metrics import calculate_metrics, TopologyMetrics
+from .builder import TopologyBuilder, build_topology
+from .metrics import TopologyMetrics, calculate_metrics
+from .visualizer import TopologyVisualizer, visualize_topology
 
 __all__ = [
     "build_topology",

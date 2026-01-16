@@ -1,10 +1,9 @@
 """Configuration management for Network Analytics Toolkit."""
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional
 import json
 import os
+from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -116,7 +115,7 @@ class Config:
             json.dump(data, f, indent=2)
 
 
-_config: Optional[Config] = None
+_config: Config | None = None
 
 
 def get_config() -> Config:

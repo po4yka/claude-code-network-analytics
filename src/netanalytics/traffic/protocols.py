@@ -1,10 +1,11 @@
 """Protocol-specific extraction and analysis."""
 
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from collections import defaultdict
+from typing import Any
 
-from scapy.all import rdpcap, IP, TCP, UDP, DNS, DNSQR, DNSRR, Raw
+from scapy.all import DNS, IP, TCP, Raw, rdpcap
 
 from ..core.exceptions import CaptureError
 
@@ -99,25 +100,32 @@ def extract_http(pcap_file: str) -> list[HTTPRequest]:
     try:
         packets = rdpcap(pcap_file)
     except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     requests = []
 
     for packet in packets:
-        if not (packet.haslayer(TCP) and packet.haslayer(Raw)):
+        if not (packet.haslayer(TCP) and packet.haslayer(Raw) and packet.haslayer(IP)):
             continue
 
         tcp = packet.getlayer(TCP)
+        ip = packet.getlayer(IP)
+        raw = packet.getlayer(Raw)
+
+        if tcp is None or ip is None or raw is None:
+            continue
+
         if tcp.dport not in (80, 8080) and tcp.sport not in (80, 8080):
             continue
 
         try:
-            payload = packet.getlayer(Raw).load.decode("utf-8", errors="ignore")
+            payload = raw.load.decode("utf-8", errors="ignore")
         except Exception:
             continue
 
         # Check if it's an HTTP request
-        if not any(payload.startswith(m) for m in ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]):
+        http_methods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
+        if not any(payload.startswith(m) for m in http_methods):
             continue
 
         lines = payload.split("\r\n")
@@ -133,13 +141,12 @@ def extract_http(pcap_file: str) -> list[HTTPRequest]:
         uri = request_line[1]
 
         # Parse headers
-        headers = {}
+        headers: dict[str, str] = {}
         for line in lines[1:]:
             if ": " in line:
                 key, value = line.split(": ", 1)
                 headers[key.lower()] = value
 
-        ip = packet.getlayer(IP)
         requests.append(
             HTTPRequest(
                 src_ip=ip.src,
@@ -173,13 +180,13 @@ def extract_dns(pcap_file: str) -> list[DNSQuery]:
     try:
         packets = rdpcap(pcap_file)
     except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     queries = []
     dns_cache = {}  # Track queries to match with responses
 
     # DNS query types
-    DNS_TYPES = {
+    dns_types = {
         1: "A",
         2: "NS",
         5: "CNAME",
@@ -193,19 +200,19 @@ def extract_dns(pcap_file: str) -> list[DNSQuery]:
     }
 
     for packet in packets:
-        if not packet.haslayer(DNS):
+        if not packet.haslayer(DNS) or not packet.haslayer(IP):
             continue
 
         dns = packet.getlayer(DNS)
-        ip = packet.getlayer(IP) if packet.haslayer(IP) else None
+        ip = packet.getlayer(IP)
 
-        if not ip:
+        if dns is None or ip is None:
             continue
 
         # DNS Query
         if dns.qr == 0 and dns.qd:
             qname = dns.qd.qname.decode() if isinstance(dns.qd.qname, bytes) else str(dns.qd.qname)
-            qtype = DNS_TYPES.get(dns.qd.qtype, str(dns.qd.qtype))
+            qtype = dns_types.get(dns.qd.qtype, str(dns.qd.qtype))
 
             # Store query for later matching
             dns_cache[dns.id] = {
@@ -262,9 +269,9 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
     try:
         packets = rdpcap(pcap_file)
     except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
-    streams = defaultdict(
+    streams: defaultdict[tuple[str, int, str, int], dict[str, Any]] = defaultdict(
         lambda: {
             "packets": 0,
             "bytes_fwd": 0,
@@ -274,11 +281,14 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
     )
 
     for packet in packets:
-        if not packet.haslayer(TCP):
+        if not packet.haslayer(TCP) or not packet.haslayer(IP):
             continue
 
         ip = packet.getlayer(IP)
         tcp = packet.getlayer(TCP)
+
+        if ip is None or tcp is None:
+            continue
 
         # Create stream key (normalized)
         endpoints = sorted([(ip.src, tcp.sport), (ip.dst, tcp.dport)])
@@ -287,15 +297,16 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
         streams[stream_key]["packets"] += 1
 
         # Track bytes
-        payload_len = len(packet.getlayer(Raw).load) if packet.haslayer(Raw) else 0
+        raw = packet.getlayer(Raw) if packet.haslayer(Raw) else None
+        payload_len = len(raw.load) if raw is not None else 0
         if (ip.src, tcp.sport) == endpoints[0]:
             streams[stream_key]["bytes_fwd"] += payload_len
         else:
             streams[stream_key]["bytes_rev"] += payload_len
 
         # Capture some data for preview
-        if packet.haslayer(Raw) and len(streams[stream_key]["data"]) < 500:
-            streams[stream_key]["data"] += packet.getlayer(Raw).load[:100]
+        if raw is not None and len(streams[stream_key]["data"]) < 500:
+            streams[stream_key]["data"] += raw.load[:100]
 
     # Convert to TCPStream objects
     result = []
@@ -305,7 +316,10 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
             try:
                 data_preview = data["data"][:200].decode("utf-8", errors="ignore")
                 # Clean up non-printable characters
-                data_preview = "".join(c if c.isprintable() or c in "\n\r\t" else "." for c in data_preview)
+                data_preview = "".join(
+                    c if c.isprintable() or c in "\n\r\t" else "."
+                    for c in data_preview
+                )
             except Exception:
                 data_preview = data["data"][:200].hex()
 

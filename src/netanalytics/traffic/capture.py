@@ -1,11 +1,11 @@
 """Packet capture using Scapy."""
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
-from scapy.all import sniff, wrpcap, rdpcap, Packet, IP, TCP, UDP, ICMP, ARP, Ether
+from scapy.all import ARP, ICMP, IP, TCP, UDP, Ether, Packet, rdpcap, sniff, wrpcap
 
 from ..core.config import get_config
 from ..core.exceptions import CaptureError, PermissionError
@@ -144,14 +144,16 @@ def capture_packets(
             store=False,
         )
     except Exception as e:
-        raise CaptureError(f"Capture failed on {interface}", str(e))
+        raise CaptureError(f"Capture failed on {interface}", str(e)) from e
 
     # Save to pcap file if requested
     if output_file and raw_packets:
         try:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             wrpcap(output_file, raw_packets)
         except Exception as e:
-            raise CaptureError(f"Failed to save pcap to {output_file}", str(e))
+            raise CaptureError(f"Failed to save pcap to {output_file}", str(e)) from e
 
     return captured
 
@@ -172,7 +174,7 @@ def read_pcap(pcap_file: str) -> list[CapturedPacket]:
     try:
         packets = rdpcap(pcap_file)
     except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     captured = []
     for i, packet in enumerate(packets):

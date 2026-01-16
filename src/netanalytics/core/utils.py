@@ -2,12 +2,13 @@
 
 import os
 import re
-import sys
-import subprocess
 import socket
-from ipaddress import ip_address, ip_network, IPv4Address, IPv4Network
+import subprocess
+import sys
+from collections.abc import Callable
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network, ip_address, ip_network
 from pathlib import Path
-from typing import Callable
+from typing import Any
 
 import psutil
 
@@ -23,8 +24,8 @@ def is_root() -> bool:
 def require_root(operation: str) -> Callable:
     """Decorator to require root privileges for an operation."""
 
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not is_root():
                 raise PermissionError(
                     operation,
@@ -64,12 +65,12 @@ def elevate_privileges() -> bool:
         return False
 
 
-def validate_ip(ip_str: str) -> IPv4Address:
+def validate_ip(ip_str: str) -> IPv4Address | IPv6Address:
     """Validate and parse an IP address string."""
     try:
         return ip_address(ip_str)
     except ValueError as e:
-        raise ValidationError(f"Invalid IP address: {ip_str}", str(e))
+        raise ValidationError(f"Invalid IP address: {ip_str}", str(e)) from e
 
 
 def resolve_target(target: str) -> str:
@@ -82,20 +83,20 @@ def resolve_target(target: str) -> str:
     try:
         return socket.gethostbyname(target)
     except socket.gaierror as e:
-        raise ValidationError(f"Invalid hostname or IP: {target}", str(e))
+        raise ValidationError(f"Invalid hostname or IP: {target}", str(e)) from e
 
 
-def validate_network(network_str: str) -> IPv4Network:
+def validate_network(network_str: str) -> IPv4Network | IPv6Network:
     """Validate and parse a network CIDR string."""
     try:
         return ip_network(network_str, strict=False)
     except ValueError as e:
-        raise ValidationError(f"Invalid network: {network_str}", str(e))
+        raise ValidationError(f"Invalid network: {network_str}", str(e)) from e
 
 
 def validate_port_range(port_range: str) -> list[int]:
     """Parse and validate a port range string (e.g., '1-1000' or '22,80,443')."""
-    ports = []
+    ports: list[int] = []
 
     for part in port_range.split(","):
         part = part.strip()
@@ -106,7 +107,7 @@ def validate_port_range(port_range: str) -> list[int]:
             try:
                 start, end = int(match.group(1)), int(match.group(2))
             except ValueError as e:
-                raise ValidationError(f"Invalid port range format: {part}", str(e))
+                raise ValidationError(f"Invalid port range format: {part}", str(e)) from e
             if not (1 <= start <= 65535 and 1 <= end <= 65535):
                 raise ValidationError(f"Port numbers must be 1-65535: {part}")
             if start > end:
@@ -116,7 +117,7 @@ def validate_port_range(port_range: str) -> list[int]:
             try:
                 port = int(part)
             except ValueError as e:
-                raise ValidationError(f"Invalid port number: {part}", str(e))
+                raise ValidationError(f"Invalid port number: {part}", str(e)) from e
             if not 1 <= port <= 65535:
                 raise ValidationError(f"Port number must be 1-65535: {port}")
             ports.append(port)
@@ -124,12 +125,16 @@ def validate_port_range(port_range: str) -> list[int]:
     return sorted(set(ports))
 
 
-def get_interfaces() -> dict[str, dict]:
+def get_interfaces() -> dict[str, dict[str, str | int | bool | None]]:
     """Get available network interfaces with their addresses."""
-    interfaces = {}
+    interfaces: dict[str, dict[str, str | int | bool | None]] = {}
 
     for name, addrs in psutil.net_if_addrs().items():
-        interface_info = {"ipv4": None, "ipv6": None, "mac": None}
+        interface_info: dict[str, str | int | bool | None] = {
+            "ipv4": None,
+            "ipv6": None,
+            "mac": None,
+        }
 
         for addr in addrs:
             if addr.family.name == "AF_INET":
@@ -154,7 +159,7 @@ def get_interfaces() -> dict[str, dict]:
 
 def get_default_interface() -> str | None:
     """Get the default network interface (one with a gateway)."""
-    gateways = psutil.net_if_stats()
+    _ = psutil.net_if_stats()  # Reserved for future gateway lookup
     interfaces = get_interfaces()
 
     # Find first interface that is up and has an IPv4 address

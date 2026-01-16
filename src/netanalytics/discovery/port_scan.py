@@ -1,14 +1,14 @@
 """Port scanning using Scapy and sockets."""
 
+import socket
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-import socket
 
-from scapy.all import IP, TCP, sr1, conf
+from scapy.all import IP, TCP, conf, sr1
 
 from ..core.config import get_config
-from ..core.exceptions import ScanError, PermissionError
+from ..core.exceptions import PermissionError, ScanError
 from ..core.utils import is_root, resolve_target, validate_port_range
 
 
@@ -164,7 +164,7 @@ def syn_scan(
         try:
             response = sr1(packet, timeout=timeout, verbose=False)
             response_time = (datetime.now() - port_start).total_seconds()
-        except Exception as e:
+        except Exception:
             results.append(
                 PortResult(
                     port=port,
@@ -283,11 +283,11 @@ def connect_scan(
                 banner = None
                 response_time = None
 
-        except socket.timeout:
+        except TimeoutError:
             state = PortState.FILTERED
             banner = None
             response_time = None
-        except socket.error:
+        except OSError:
             state = PortState.FILTERED
             banner = None
             response_time = None

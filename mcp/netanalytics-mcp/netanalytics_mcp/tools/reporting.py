@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from netanalytics.core.utils import get_interfaces, get_default_interface
 from netanalytics.core.config import get_config
+from netanalytics.core.utils import get_default_interface, get_interfaces
 from netanalytics.output import generate_report
 
 
@@ -15,8 +15,12 @@ def register_reporting_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def create_network_report(
         target: Annotated[str, "Target IP, hostname, or network CIDR"],
-        format: Annotated[str, "Report format: 'html', 'md', or 'json' (default: html)"] = "html",
-        output_path: Annotated[str | None, "Output file path (auto-generated if not provided)"] = None,
+        format: Annotated[
+            str, "Report format: 'html', 'md', or 'json' (default: html)"
+        ] = "html",
+        output_path: Annotated[
+            str | None, "Output file path (auto-generated if not provided)"
+        ] = None,
     ) -> dict:
         """Generate a comprehensive network report for a target.
 
@@ -30,7 +34,10 @@ def register_reporting_tools(mcp: FastMCP) -> None:
         Returns the path to the generated report file.
         """
         if format not in ("html", "md", "json"):
-            return {"error": f"Invalid format: {format}. Use 'html', 'md', or 'json'.", "path": None}
+            return {
+                "error": f"Invalid format: {format}. Use 'html', 'md', or 'json'.",
+                "path": None,
+            }
 
         try:
             report_path = generate_report(

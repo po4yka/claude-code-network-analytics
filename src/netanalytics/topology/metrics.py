@@ -1,7 +1,6 @@
 """Network topology metrics and analysis using NetworkX."""
 
 from dataclasses import dataclass
-from typing import Any
 
 import networkx as nx
 
@@ -32,7 +31,9 @@ class TopologyMetrics:
             "clustering_coefficient": round(self.clustering_coefficient, 4),
             "connected_components": self.connected_components,
             "diameter": self.diameter,
-            "average_path_length": round(self.average_path_length, 2) if self.average_path_length else None,
+            "average_path_length": (
+                round(self.average_path_length, 2) if self.average_path_length else None
+            ),
             "centrality": {
                 measure: {node: round(val, 4) for node, val in values.items()}
                 for measure, values in self.centrality.items()
@@ -71,7 +72,7 @@ class TopologyMetrics:
 
 def calculate_centrality(graph: nx.Graph) -> dict[str, dict[str, float]]:
     """Calculate various centrality measures."""
-    centrality = {}
+    centrality: dict[str, dict[str, float]] = {}
 
     if not graph.nodes():
         return centrality

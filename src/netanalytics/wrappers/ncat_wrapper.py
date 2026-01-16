@@ -1,12 +1,12 @@
 """Wrapper for ncat (Netcat) utility."""
 
-from dataclasses import dataclass
+import contextlib
 import socket
 import subprocess
-from typing import Generator
+from dataclasses import dataclass
 
-from ..core.exceptions import NetworkError, DependencyError
-from ..core.utils import check_dependency, validate_ip
+from ..core.exceptions import DependencyError, NetworkError
+from ..core.utils import check_dependency
 
 
 @dataclass
@@ -89,20 +89,16 @@ class NcatClient:
                 sock.setblocking(True)
                 sock.settimeout(timeout)
                 sock.send(send_data)
-                try:
+                with contextlib.suppress(Exception):
                     banner = sock.recv(4096).decode("utf-8", errors="ignore").strip()
-                except Exception:
-                    pass
 
             # Try HTTP if still no banner
             if not banner:
                 sock.setblocking(True)
                 sock.settimeout(timeout)
                 sock.send(b"HEAD / HTTP/1.0\r\nHost: localhost\r\n\r\n")
-                try:
+                with contextlib.suppress(Exception):
                     banner = sock.recv(4096).decode("utf-8", errors="ignore").strip()
-                except Exception:
-                    pass
 
             return BannerResult(
                 host=host,
@@ -112,7 +108,7 @@ class NcatClient:
                 error=None,
             )
 
-        except socket.timeout:
+        except TimeoutError:
             return BannerResult(
                 host=host,
                 port=port,
@@ -120,7 +116,7 @@ class NcatClient:
                 success=False,
                 error="Connection timeout",
             )
-        except socket.error as e:
+        except OSError as e:
             return BannerResult(
                 host=host,
                 port=port,
@@ -162,7 +158,7 @@ class NcatClient:
                 stderr=subprocess.PIPE,
             )
         except Exception as e:
-            raise NetworkError(f"Failed to connect to {host}:{port}", str(e))
+            raise NetworkError(f"Failed to connect to {host}:{port}", str(e)) from e
 
     def send_receive(
         self,
@@ -191,8 +187,8 @@ class NcatClient:
             sock.send(data)
             response = sock.recv(8192)
             return response
-        except socket.error as e:
-            raise NetworkError(f"Send/receive failed to {host}:{port}", str(e))
+        except OSError as e:
+            raise NetworkError(f"Send/receive failed to {host}:{port}", str(e)) from e
         finally:
             sock.close()
 
@@ -246,4 +242,4 @@ class NcatClient:
                 stderr=subprocess.PIPE,
             )
         except Exception as e:
-            raise NetworkError(f"Failed to listen on port {port}", str(e))
+            raise NetworkError(f"Failed to listen on port {port}", str(e)) from e

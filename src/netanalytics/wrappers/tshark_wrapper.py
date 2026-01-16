@@ -1,10 +1,10 @@
 """Wrapper for tshark/Wireshark using PyShark."""
 
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Any
-import subprocess
+from typing import Any
 
 from ..core.exceptions import CaptureError, DependencyError
 from ..core.utils import check_dependency
@@ -87,8 +87,8 @@ class TsharkCapture:
         """
         try:
             import pyshark
-        except ImportError:
-            raise DependencyError("pyshark", "Install with: pip install pyshark")
+        except ImportError as e:
+            raise DependencyError("pyshark", "Install with: pip install pyshark") from e
 
         capture_args = {
             "interface": interface,
@@ -127,7 +127,7 @@ class TsharkCapture:
             return packets
 
         except Exception as e:
-            raise CaptureError(f"Tshark capture failed on {interface}", str(e))
+            raise CaptureError(f"Tshark capture failed on {interface}", str(e)) from e
 
     def read_pcap(self, pcap_file: str) -> list[PacketInfo]:
         """
@@ -141,8 +141,8 @@ class TsharkCapture:
         """
         try:
             import pyshark
-        except ImportError:
-            raise DependencyError("pyshark", "Install with: pip install pyshark")
+        except ImportError as e:
+            raise DependencyError("pyshark", "Install with: pip install pyshark") from e
 
         if not Path(pcap_file).exists():
             raise CaptureError(f"Pcap file not found: {pcap_file}")
@@ -170,7 +170,7 @@ class TsharkCapture:
             return packets
 
         except Exception as e:
-            raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+            raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     def analyze(self, pcap_file: str) -> TsharkAnalysis:
         """

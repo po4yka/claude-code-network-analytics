@@ -1,13 +1,12 @@
 """Wrapper for nmap using python-nmap library."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
 import nmap
 
-from ..core.exceptions import ScanError, DependencyError
-from ..core.utils import validate_ip, validate_network, check_dependency
+from ..core.exceptions import DependencyError, ScanError
+from ..core.utils import check_dependency
 
 
 @dataclass
@@ -60,7 +59,10 @@ class NmapScanner:
 
     def __init__(self) -> None:
         if not check_dependency("nmap"):
-            raise DependencyError("nmap", "Install with: brew install nmap (macOS) or apt install nmap (Linux)")
+            raise DependencyError(
+                "nmap",
+                "Install with: brew install nmap (macOS) or apt install nmap (Linux)",
+            )
 
         self.nm = nmap.PortScanner()
 
@@ -88,7 +90,7 @@ class NmapScanner:
         try:
             self.nm.scan(hosts=target, ports=ports, arguments=arguments, sudo=sudo)
         except nmap.PortScannerError as e:
-            raise ScanError(f"Nmap scan failed for {target}", str(e))
+            raise ScanError(f"Nmap scan failed for {target}", str(e)) from e
 
         hosts = []
         for host in self.nm.all_hosts():

@@ -1,15 +1,12 @@
 """Report generation functionality."""
 
-from dataclasses import dataclass
+import json
 from datetime import datetime
 from pathlib import Path
-import json
 
 from jinja2 import Template
 
-from ..core.config import get_config
 from ..core.utils import ensure_results_dir
-
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -20,14 +17,32 @@ HTML_TEMPLATE = """
     <title>Network Analysis Report - {{ target }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6; color: #333; max-width: 1200px;
+            margin: 0 auto; padding: 20px; background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px;
+        }
         .header h1 { font-size: 2em; margin-bottom: 10px; }
         .header .meta { opacity: 0.9; font-size: 0.9em; }
-        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .card h2 { color: #667eea; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .summary-item { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .card {
+            background: white; border-radius: 10px; padding: 20px;
+            margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            color: #667eea; border-bottom: 2px solid #eee;
+            padding-bottom: 10px; margin-bottom: 15px;
+        }
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .summary-item {
+            background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;
+        }
         .summary-item .value { font-size: 2em; font-weight: bold; color: #667eea; }
         .summary-item .label { color: #666; font-size: 0.9em; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -37,12 +52,18 @@ HTML_TEMPLATE = """
         .severity-high { color: #fd7e14; font-weight: bold; }
         .severity-medium { color: #ffc107; }
         .severity-low { color: #28a745; }
-        .risk-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: bold; color: white; }
+        .risk-badge {
+            display: inline-block; padding: 5px 15px; border-radius: 20px;
+            font-weight: bold; color: white;
+        }
         .risk-critical { background: #dc3545; }
         .risk-high { background: #fd7e14; }
         .risk-medium { background: #ffc107; color: #333; }
         .risk-low { background: #28a745; }
-        .recommendation { background: #e7f3ff; border-left: 4px solid #667eea; padding: 10px 15px; margin: 10px 0; border-radius: 0 5px 5px 0; }
+        .recommendation {
+            background: #e7f3ff; border-left: 4px solid #667eea;
+            padding: 10px 15px; margin: 10px 0; border-radius: 0 5px 5px 0;
+        }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9em; }
     </style>
 </head>
@@ -72,7 +93,9 @@ HTML_TEMPLATE = """
                 <div class="label">Vulnerabilities</div>
             </div>
             <div class="summary-item">
-                <div class="value"><span class="risk-badge risk-{{ risk_level }}">{{ risk_level|upper }}</span></div>
+                <div class="value">
+                    <span class="risk-badge risk-{{ risk_level }}">{{ risk_level|upper }}</span>
+                </div>
                 <div class="label">Risk Level</div>
             </div>
         </div>
@@ -88,7 +111,7 @@ HTML_TEMPLATE = """
                 <td>{{ port.port }}</td>
                 <td>{{ port.service or '-' }}</td>
                 <td>{{ port.version or '-' }}</td>
-                <td>{{ port.banner[:50] if port.banner else '-' }}{{ '...' if port.banner and port.banner|length > 50 else '' }}</td>
+                <td>{% if port.banner %}{{ port.banner[:50] }}{% if port.banner|length > 50 %}...{% endif %}{% else %}-{% endif %}</td>
             </tr>
             {% endfor %}
         </table>
@@ -257,7 +280,9 @@ class ReportGenerator:
         html = template.render(**self.data)
 
         if output_file:
-            Path(output_file).write_text(html)
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(html)
 
         return html
 
@@ -267,7 +292,9 @@ class ReportGenerator:
         md = template.render(**self.data)
 
         if output_file:
-            Path(output_file).write_text(md)
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(md)
 
         return md
 
@@ -276,7 +303,9 @@ class ReportGenerator:
         json_str = json.dumps(self.data, indent=2)
 
         if output_file:
-            Path(output_file).write_text(json_str)
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json_str)
 
         return json_str
 

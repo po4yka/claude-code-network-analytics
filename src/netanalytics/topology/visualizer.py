@@ -1,14 +1,12 @@
 """Network topology visualization using Matplotlib."""
 
-from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import networkx as nx
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import networkx as nx
 
 from ..core.config import get_config
-
 
 # Color scheme for node types
 NODE_COLORS = {
@@ -28,16 +26,18 @@ class TopologyVisualizer:
 
     def _get_layout(self, layout: str) -> dict[Any, tuple[float, float]]:
         """Get node positions based on layout algorithm."""
+        layout_result: Any
         if layout == "spring":
-            return nx.spring_layout(self.graph, k=2, iterations=50)
+            layout_result = nx.spring_layout(self.graph, k=2, iterations=50)
         elif layout == "circular":
-            return nx.circular_layout(self.graph)
+            layout_result = nx.circular_layout(self.graph)
         elif layout == "shell":
-            return nx.shell_layout(self.graph)
+            layout_result = nx.shell_layout(self.graph)
         elif layout == "kamada_kawai":
-            return nx.kamada_kawai_layout(self.graph)
+            layout_result = nx.kamada_kawai_layout(self.graph)
         else:
-            return nx.spring_layout(self.graph)
+            layout_result = nx.spring_layout(self.graph)
+        return cast(dict[Any, tuple[float, float]], layout_result)
 
     def _get_node_colors(self) -> list[str]:
         """Get colors for each node based on type."""
@@ -61,7 +61,7 @@ class TopologyVisualizer:
     def _get_edge_weights(self) -> list[float]:
         """Get edge weights for line thickness."""
         weights = []
-        for u, v, data in self.graph.edges(data=True):
+        for _u, _v, data in self.graph.edges(data=True):
             weight = data.get("weight", 1)
             # Normalize weight for visibility
             normalized = min(max(weight / 10, 0.5), 5)
@@ -146,6 +146,8 @@ class TopologyVisualizer:
         plt.tight_layout()
 
         if output_file:
+            from pathlib import Path
+            Path(output_file).parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(output_file, dpi=150, bbox_inches="tight")
 
         if show:
@@ -155,17 +157,22 @@ class TopologyVisualizer:
 
     def to_graphml(self, output_file: str) -> None:
         """Export topology to GraphML format."""
+        from pathlib import Path
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         nx.write_graphml(self.graph, output_file)
 
     def to_gexf(self, output_file: str) -> None:
         """Export topology to GEXF format (Gephi)."""
+        from pathlib import Path
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
         nx.write_gexf(self.graph, output_file)
 
-    def to_json(self) -> dict:
+    def to_json(self) -> dict[str, Any]:
         """Export topology to JSON-compatible dict."""
         from networkx.readwrite import json_graph
 
-        return json_graph.node_link_data(self.graph)
+        result: dict[str, Any] = json_graph.node_link_data(self.graph)
+        return result
 
 
 def visualize_topology(

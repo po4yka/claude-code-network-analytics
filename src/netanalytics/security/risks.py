@@ -63,11 +63,11 @@ class RiskAnalysis:
 
 def _calculate_port_risk(open_ports: list[int]) -> RiskFactor:
     """Calculate risk based on open ports."""
-    HIGH_RISK_PORTS = {21, 23, 445, 3389, 1433, 1521, 3306, 5432, 27017}
-    MEDIUM_RISK_PORTS = {22, 25, 53, 110, 143, 161, 389, 636}
+    high_risk_ports = {21, 23, 445, 3389, 1433, 1521, 3306, 5432, 6379, 27017}
+    medium_risk_ports = {22, 25, 53, 110, 143, 161, 389, 636}
 
-    high_risk_count = sum(1 for p in open_ports if p in HIGH_RISK_PORTS)
-    medium_risk_count = sum(1 for p in open_ports if p in MEDIUM_RISK_PORTS)
+    high_risk_count = sum(1 for p in open_ports if p in high_risk_ports)
+    medium_risk_count = sum(1 for p in open_ports if p in medium_risk_ports)
 
     if high_risk_count >= 3:
         return RiskFactor(
@@ -226,24 +226,28 @@ def analyze_risks(
     if services:
         factors.append(_calculate_service_risk(services))
 
-    factors.append(_calculate_vuln_risk(vulnerabilities))
+    if vulnerabilities:
+        factors.append(_calculate_vuln_risk(vulnerabilities))
 
-    # Calculate overall score (weighted average)
+    # Calculate overall score (average of factors)
     if factors:
         total_score = sum(f.score for f in factors)
         overall_score = total_score / len(factors)
     else:
         overall_score = 0.0
 
-    # Determine overall level
-    if overall_score >= 8.0:
-        overall_level = RiskLevel.CRITICAL
-    elif overall_score >= 6.0:
-        overall_level = RiskLevel.HIGH
-    elif overall_score >= 4.0:
-        overall_level = RiskLevel.MEDIUM
-    elif overall_score >= 2.0:
-        overall_level = RiskLevel.LOW
+    # Determine overall level: use the highest (worst) level among all factors
+    # This ensures critical findings are never diluted by averaging
+    level_priority = {
+        RiskLevel.CRITICAL: 5,
+        RiskLevel.HIGH: 4,
+        RiskLevel.MEDIUM: 3,
+        RiskLevel.LOW: 2,
+        RiskLevel.INFO: 1,
+    }
+
+    if factors:
+        overall_level = max(factors, key=lambda f: level_priority[f.level]).level
     else:
         overall_level = RiskLevel.INFO
 

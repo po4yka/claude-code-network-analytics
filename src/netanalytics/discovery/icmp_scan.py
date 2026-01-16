@@ -2,14 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from ipaddress import IPv4Network
-import socket
 
-from scapy.all import IP, ICMP, sr1, sr, conf
+from scapy.all import ICMP, IP, conf, sr, sr1
 
 from ..core.config import get_config
-from ..core.exceptions import ScanError, PermissionError
-from ..core.utils import is_root, validate_network, validate_ip, resolve_hostname
+from ..core.exceptions import PermissionError, ScanError
+from ..core.utils import is_root, resolve_hostname, validate_ip, validate_network
 
 
 @dataclass
@@ -63,7 +61,7 @@ def ping_host(ip: str, timeout: float = 2.0, count: int = 1) -> ICMPResult:
 
         try:
             reply = sr1(packet, timeout=timeout, verbose=False)
-        except Exception as e:
+        except Exception:
             continue
 
         if reply and reply.haslayer(ICMP):
@@ -122,7 +120,7 @@ def icmp_scan(
         inter = 1.0 / rate_limit if rate_limit and not config.fast_mode else 0
         answered, unanswered = sr(packets, timeout=timeout, inter=inter, verbose=False)
     except Exception as e:
-        raise ScanError(f"ICMP scan failed for {network}", str(e))
+        raise ScanError(f"ICMP scan failed for {network}", str(e)) from e
 
     results = []
 

@@ -1,8 +1,8 @@
 """Security assessment module - vulnerability checks, risk analysis."""
 
-from .assessment import security_assessment, SecurityAssessment
-from .vulnerabilities import check_vulnerabilities, VulnerabilityCheck
-from .risks import analyze_risks, RiskLevel
+from .assessment import SecurityAssessment, security_assessment
+from .risks import RiskLevel, analyze_risks
+from .vulnerabilities import VulnerabilityCheck, check_vulnerabilities
 
 __all__ = [
     "security_assessment",

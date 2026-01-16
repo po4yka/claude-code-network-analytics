@@ -1,7 +1,7 @@
 """Output module - report generation, JSON export, HTML reports."""
 
-from .reports import generate_report, ReportGenerator
-from .export import export_json, export_csv
+from .export import export_csv, export_json
+from .reports import ReportGenerator, generate_report
 
 __all__ = [
     "generate_report",

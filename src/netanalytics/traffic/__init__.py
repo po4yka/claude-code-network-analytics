@@ -1,8 +1,8 @@
 """Traffic analysis module - packet capture, protocol analysis, statistics."""
 
-from .capture import capture_packets, PacketCapture
-from .analyzer import analyze_pcap, ProtocolAnalyzer, TrafficStats
-from .protocols import extract_http, extract_dns, extract_tcp_streams
+from .analyzer import ProtocolAnalyzer, TrafficStats, analyze_pcap
+from .capture import PacketCapture, capture_packets
+from .protocols import extract_dns, extract_http, extract_tcp_streams
 
 __all__ = [
     "capture_packets",

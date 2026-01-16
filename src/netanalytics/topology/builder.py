@@ -1,12 +1,11 @@
 """Network topology graph builder."""
 
 from dataclasses import dataclass
-from datetime import datetime
 
 import networkx as nx
 
 from ..core.exceptions import ScanError
-from ..core.utils import validate_network, is_root
+from ..core.utils import is_root
 from ..discovery import arp_scan
 
 
@@ -97,12 +96,12 @@ class TopologyBuilder:
 
     def discover_from_pcap(self, pcap_file: str) -> None:
         """Build topology from pcap file analysis."""
-        from scapy.all import rdpcap, IP
+        from scapy.all import IP, rdpcap
 
         try:
             packets = rdpcap(pcap_file)
         except Exception as e:
-            raise ScanError(f"Failed to read pcap: {pcap_file}", str(e))
+            raise ScanError(f"Failed to read pcap: {pcap_file}", str(e)) from e
 
         # Track connections
         connections: dict[tuple[str, str], int] = {}

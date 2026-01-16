@@ -1,8 +1,8 @@
 """External tool wrappers - nmap, tshark, ncat."""
 
-from .nmap_wrapper import NmapScanner, NmapResult
-from .tshark_wrapper import TsharkCapture, TsharkAnalysis
 from .ncat_wrapper import NcatClient
+from .nmap_wrapper import NmapResult, NmapScanner
+from .tshark_wrapper import TsharkAnalysis, TsharkCapture
 
 __all__ = [
     "NmapScanner",

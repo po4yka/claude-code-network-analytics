@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from netanalytics.security import security_assessment, check_vulnerabilities, analyze_risks
+from netanalytics.security import analyze_risks, check_vulnerabilities, security_assessment
 
 
 def register_security_tools(mcp: FastMCP) -> None:

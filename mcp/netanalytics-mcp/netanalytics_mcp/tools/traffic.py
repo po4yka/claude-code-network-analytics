@@ -5,9 +5,9 @@ from typing import Annotated
 
 from fastmcp import FastMCP
 
-from netanalytics.core.utils import is_root, get_interfaces
 from netanalytics.core.config import get_config
-from netanalytics.traffic import capture_packets, analyze_pcap, extract_http, extract_dns
+from netanalytics.core.utils import get_interfaces, is_root
+from netanalytics.traffic import analyze_pcap, capture_packets, extract_dns, extract_http
 
 
 def _validate_pcap_path(pcap_path: str) -> tuple[bool, str]:
@@ -25,7 +25,7 @@ def _validate_pcap_path(pcap_path: str) -> tuple[bool, str]:
         if not path.is_file():
             return False, f"Not a file: {pcap_path}"
 
-    if not path.suffix.lower() in (".pcap", ".pcapng", ".cap"):
+    if path.suffix.lower() not in (".pcap", ".pcapng", ".cap"):
         return False, f"File must be a pcap file: {pcap_path}"
 
     return True, str(path)
@@ -94,7 +94,9 @@ def register_traffic_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def analyze_pcap_file(
         pcap_path: Annotated[str, "Path to the pcap file to analyze"],
-        protocol: Annotated[str, "Protocol filter: 'all', 'tcp', 'udp', 'http', 'dns' (default: all)"] = "all",
+        protocol: Annotated[
+            str, "Protocol filter: 'all', 'tcp', 'udp', 'http', 'dns' (default: all)"
+        ] = "all",
     ) -> dict:
         """Analyze a pcap file and extract statistics.
 

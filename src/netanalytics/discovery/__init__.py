@@ -2,7 +2,7 @@
 
 from .arp_scan import arp_scan, arp_scan_single
 from .icmp_scan import icmp_scan, ping_host
-from .port_scan import port_scan, syn_scan, connect_scan
+from .port_scan import connect_scan, port_scan, syn_scan
 from .service_detect import detect_service, detect_services
 
 __all__ = [

@@ -1,11 +1,11 @@
 """Security assessment functionality."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
-from .vulnerabilities import check_vulnerabilities, VulnerabilityResult
-from .risks import analyze_risks, RiskLevel, RiskAnalysis
+from .risks import RiskAnalysis, RiskLevel, analyze_risks
+from .vulnerabilities import VulnerabilityResult, check_vulnerabilities
 
 
 class AssessmentLevel(Enum):
@@ -91,8 +91,7 @@ def security_assessment(
     Returns:
         SecurityAssessment with findings
     """
-    from ..discovery import port_scan, detect_services
-    from ..discovery.port_scan import PortState
+    from ..discovery import detect_services, port_scan
 
     assessment_level = AssessmentLevel(level)
     start_time = datetime.now()
@@ -122,7 +121,9 @@ def security_assessment(
     risk_analysis = analyze_risks(open_ports, services, vulnerabilities)
 
     # Generate recommendations
-    recommendations = _generate_recommendations(open_ports, services, vulnerabilities, risk_analysis)
+    recommendations = _generate_recommendations(
+        open_ports, services, vulnerabilities, risk_analysis
+    )
 
     end_time = datetime.now()
 
@@ -170,7 +171,9 @@ def _generate_recommendations(
     # Vulnerability-based recommendations
     critical_vulns = [v for v in vulnerabilities if v.severity == "critical"]
     if critical_vulns:
-        recommendations.insert(0, f"URGENT: Address {len(critical_vulns)} critical vulnerabilities immediately.")
+        recommendations.insert(
+            0, f"URGENT: Address {len(critical_vulns)} critical vulnerabilities immediately."
+        )
 
     # General recommendations based on risk level
     if risk_analysis.overall_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):

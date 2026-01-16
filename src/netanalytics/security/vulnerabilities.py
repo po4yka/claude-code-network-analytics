@@ -1,7 +1,6 @@
 """Vulnerability checking functionality."""
 
 from dataclasses import dataclass
-from typing import Callable
 
 
 @dataclass
@@ -62,10 +61,11 @@ class DefaultCredentialsCheck(VulnerabilityCheck):
         service = service_info.get("service", "").lower()
 
         if service in self.VULNERABLE_SERVICES:
+            vuln_service = self.VULNERABLE_SERVICES[service]
             return VulnerabilityResult(
                 name=self.name,
                 severity=self.severity,
-                description=f"Service may be vulnerable to default credentials: {self.VULNERABLE_SERVICES[service]}",
+                description=f"Service may be vulnerable to default credentials: {vuln_service}",
                 port=port,
                 service=service,
                 remediation="Change default credentials immediately.",
@@ -131,7 +131,7 @@ class OutdatedServiceCheck(VulnerabilityCheck):
                     description=f"{product} version {version} may have known vulnerabilities.",
                     port=port,
                     service=service_info.get("service"),
-                    remediation=f"Update to the latest version.",
+                    remediation="Update to the latest version.",
                     cve=info.get("cve"),
                 )
         return None

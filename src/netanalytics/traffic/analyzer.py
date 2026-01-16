@@ -1,11 +1,10 @@
 """Traffic analysis and statistics."""
 
-from dataclasses import dataclass, field
 from collections import Counter, defaultdict
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 
-from scapy.all import rdpcap, IP, TCP, UDP, ICMP, DNS, Raw
+from scapy.all import DNS, ICMP, IP, TCP, UDP, rdpcap
 
 from ..core.exceptions import CaptureError
 
@@ -189,7 +188,7 @@ def analyze_pcap(
     try:
         packets = rdpcap(pcap_file)
     except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e))
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     analyzer = ProtocolAnalyzer()
 
@@ -197,12 +196,15 @@ def analyze_pcap(
         # Apply protocol filter
         if protocol_filter == "tcp" and not packet.haslayer(TCP):
             continue
-        elif protocol_filter == "udp" and not packet.haslayer(UDP):
+        if protocol_filter == "udp" and not packet.haslayer(UDP):
             continue
-        elif protocol_filter == "http":
-            if not (packet.haslayer(TCP) and (packet.sport == 80 or packet.dport == 80 or packet.sport == 443 or packet.dport == 443)):
+        if protocol_filter == "http":
+            if not packet.haslayer(TCP):
                 continue
-        elif protocol_filter == "dns" and not packet.haslayer(DNS):
+            http_ports = (80, 443)
+            if packet.sport not in http_ports and packet.dport not in http_ports:
+                continue
+        if protocol_filter == "dns" and not packet.haslayer(DNS):
             continue
 
         analyzer.add_packet(packet)

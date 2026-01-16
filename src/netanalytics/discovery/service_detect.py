@@ -1,11 +1,9 @@
 """Service detection and banner grabbing."""
 
-from dataclasses import dataclass
-from datetime import datetime
-import socket
 import re
+import socket
+from dataclasses import dataclass
 
-from ..core.exceptions import ScanError
 from ..core.utils import resolve_target, validate_port_range
 
 
@@ -120,9 +118,9 @@ def _parse_ssh_banner(banner: str) -> dict:
     return info
 
 
-def _parse_http_banner(banner: str) -> dict:
+def _parse_http_banner(banner: str) -> dict[str, str | int]:
     """Parse HTTP response to extract server info."""
-    info = {"service": "http"}
+    info: dict[str, str | int] = {"service": "http"}
 
     # Extract status code
     status_match = re.match(r"HTTP/[\d.]+\s+(\d+)", banner)
@@ -202,14 +200,14 @@ def detect_service(ip: str, port: int, timeout: float = 5.0) -> ServiceInfo:
 
     if banner.startswith("SSH-"):
         info = _parse_ssh_banner(banner)
-        service = info.get("service", "ssh")
-        version = info.get("version")
+        service = str(info.get("service", "ssh"))
+        version = str(info["version"]) if info.get("version") else None
         extra_info = info
 
     elif banner.startswith("HTTP/") or "HTTP/" in banner:
         info = _parse_http_banner(banner)
-        service = info.get("service", "http")
-        version = info.get("version")
+        service = str(info.get("service", "http"))
+        version = str(info["version"]) if info.get("version") else None
         extra_info = info
 
     elif banner.startswith("220"):
@@ -217,8 +215,8 @@ def detect_service(ip: str, port: int, timeout: float = 5.0) -> ServiceInfo:
             service = "smtp"
         else:
             info = _parse_ftp_banner(banner)
-            service = info.get("service", "ftp")
-            version = info.get("version")
+            service = str(info.get("service", "ftp"))
+            version = str(info["version"]) if info.get("version") else None
             extra_info = info
 
     elif banner.startswith("+OK"):
@@ -262,10 +260,7 @@ def detect_services(
     """
     resolved_ip = resolve_target(ip)
 
-    if isinstance(ports, str):
-        port_list = validate_port_range(ports)
-    else:
-        port_list = ports
+    port_list = validate_port_range(ports) if isinstance(ports, str) else ports
 
     results = []
     for port in port_list:

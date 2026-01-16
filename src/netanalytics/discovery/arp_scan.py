@@ -2,18 +2,17 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from ipaddress import IPv4Network
 
-from scapy.all import ARP, Ether, srp, conf
+from scapy.all import ARP, Ether, conf, srp
 
 from ..core.config import get_config
-from ..core.exceptions import ScanError, PermissionError
+from ..core.exceptions import PermissionError, ScanError
 from ..core.utils import (
-    is_root,
-    validate_network,
     format_mac,
-    resolve_hostname,
     get_oui_vendor,
+    is_root,
+    resolve_hostname,
+    validate_network,
 )
 
 
@@ -52,7 +51,7 @@ def arp_scan_single(ip: str, timeout: float = 2.0) -> ARPResult | None:
     try:
         answered, _ = srp(arp_request, timeout=timeout, verbose=False)
     except Exception as e:
-        raise ScanError(f"ARP scan failed for {ip}", str(e))
+        raise ScanError(f"ARP scan failed for {ip}", str(e)) from e
 
     if not answered:
         return None
@@ -118,7 +117,7 @@ def arp_scan(
         inter = 1.0 / rate_limit if rate_limit and not config.fast_mode else 0
         answered, _ = srp(arp_request, timeout=timeout, inter=inter, verbose=False)
     except Exception as e:
-        raise ScanError(f"ARP scan failed for {network}", str(e))
+        raise ScanError(f"ARP scan failed for {network}", str(e)) from e
 
     results = []
     for sent, received in answered:

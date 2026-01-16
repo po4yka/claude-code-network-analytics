@@ -5,7 +5,7 @@ from typing import Annotated
 from fastmcp import FastMCP
 
 from netanalytics.core.utils import is_root, validate_network, validate_port_range
-from netanalytics.discovery import arp_scan, port_scan, detect_services
+from netanalytics.discovery import arp_scan, detect_services, port_scan
 
 
 def register_discovery_tools(mcp: FastMCP) -> None:
@@ -33,7 +33,10 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         # Check root for methods that require it
         if method in ("arp", "icmp") and not is_root():
             return {
-                "error": f"{method.upper()} scan requires root privileges. Run the MCP server with sudo.",
+                "error": (
+                    f"{method.upper()} scan requires root privileges. "
+                    "Run the MCP server with sudo."
+                ),
                 "requires_root": True,
                 "hosts": [],
             }
@@ -77,10 +80,16 @@ def register_discovery_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def scan_ports(
         target: Annotated[str, "Target IP address or hostname to scan"],
-        ports: Annotated[str, "Ports to scan: range '1-1000' or list '22,80,443' (default: 1-1000)"] = "1-1000",
-        scan_type: Annotated[str, "Scan type: 'syn' (requires root) or 'connect' (default: connect)"] = "connect",
+        ports: Annotated[
+            str, "Ports to scan: range '1-1000' or list '22,80,443' (default: 1-1000)"
+        ] = "1-1000",
+        scan_type: Annotated[
+            str, "Scan type: 'syn' (requires root) or 'connect' (default: connect)"
+        ] = "connect",
         timeout: Annotated[float, "Timeout per port in seconds (default: 2.0)"] = 2.0,
-        grab_banner: Annotated[bool, "Attempt to grab service banners (connect scan only)"] = False,
+        grab_banner: Annotated[
+            bool, "Attempt to grab service banners (connect scan only)"
+        ] = False,
     ) -> dict:
         """Scan ports on a target host.
 
@@ -98,7 +107,10 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         # Check root for SYN scan
         if scan_type == "syn" and not is_root():
             return {
-                "error": "SYN scan requires root privileges. Use scan_type='connect' or run with sudo.",
+                "error": (
+                    "SYN scan requires root privileges. "
+                    "Use scan_type='connect' or run with sudo."
+                ),
                 "requires_root": True,
                 "ports": [],
             }
