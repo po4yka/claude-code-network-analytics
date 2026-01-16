@@ -205,6 +205,7 @@ def get_oui_vendor(mac: str) -> str | None:
     """Look up vendor from MAC OUI (first 3 octets)."""
     # Basic OUI lookup - in production, use a full OUI database
     oui_map = {
+        # Infrastructure
         "00:00:0c": "Cisco",
         "00:1a:2b": "Hewlett-Packard",
         "00:50:56": "VMware",
@@ -212,6 +213,53 @@ def get_oui_vendor(mac: str) -> str | None:
         "52:54:00": "QEMU/KVM",
         "dc:a6:32": "Raspberry Pi",
         "b8:27:eb": "Raspberry Pi",
+        # Xiaomi Communications
+        "28:6c:07": "Xiaomi",
+        "64:cc:2e": "Xiaomi",
+        "78:11:dc": "Xiaomi",
+        "7c:49:eb": "Xiaomi",
+        "04:cf:8c": "Xiaomi",
+        "18:59:36": "Xiaomi",
+        "f8:a4:5f": "Xiaomi",
+        "00:9e:c8": "Xiaomi",
+        "0c:1d:af": "Xiaomi",
+        "10:2a:b3": "Xiaomi",
+        "14:f6:5a": "Xiaomi",
+        "20:34:fb": "Xiaomi",
+        "34:80:b3": "Xiaomi",
+        "38:a4:ed": "Xiaomi",
+        "3c:bd:3e": "Xiaomi",
+        "44:23:7c": "Xiaomi",
+        "50:8f:4c": "Xiaomi",
+        "58:44:98": "Xiaomi",
+        "64:b4:73": "Xiaomi",
+        "68:ab:1e": "Xiaomi",
+        "74:23:44": "Xiaomi",
+        "7c:1c:68": "Xiaomi",
+        "84:f3:eb": "Xiaomi",
+        "8c:be:be": "Xiaomi",
+        "9c:99:a0": "Xiaomi",
+        "a4:77:33": "Xiaomi",
+        "ac:c1:ee": "Xiaomi",
+        "b0:e2:35": "Xiaomi",
+        "c4:6a:b7": "Xiaomi",
+        "d4:97:0b": "Xiaomi",
+        "e4:46:da": "Xiaomi",
+        "ec:d0:9f": "Xiaomi",
+        "f0:b4:29": "Xiaomi",
+        "fc:64:ba": "Xiaomi",
+        # Lumi/Aqara (Xiaomi subsidiary)
+        "50:64:2b": "Lumi/Aqara",
+        "54:ef:44": "Lumi/Aqara",
+        "04:cf:8c": "Lumi/Aqara",
+        # Yeelight
+        "7c:49:eb": "Yeelight",
+        "44:23:7c": "Yeelight",
+        # Roborock (Xiaomi ecosystem)
+        "50:ec:50": "Roborock",
+        "e4:aa:ec": "Roborock",
+        # Dreame (Xiaomi ecosystem)
+        "c8:47:8c": "Dreame",
     }
 
     mac_normalized = format_mac(mac)

@@ -467,5 +467,336 @@ def list_interfaces() -> None:
     console.print(table)
 
 
+# Smart Home command group
+@main.group()
+def smarthome() -> None:
+    """Smart home device discovery and management."""
+    pass
+
+
+@smarthome.command("discover")
+@click.option(
+    "--method",
+    type=click.Choice(["all", "miio", "mdns", "aqara", "matter"]),
+    default="all",
+    help="Discovery method (default: all)",
+)
+@click.option("--timeout", type=float, default=5.0, help="Discovery timeout in seconds")
+@click.option("--output", "-o", type=click.Path(), help="Output file (JSON)")
+@click.option("--no-cache", is_flag=True, help="Bypass discovery cache")
+def smarthome_discover(method: str, timeout: float, output: str | None, no_cache: bool) -> None:
+    """Discover smart home devices on the local network.
+
+    Supports Xiaomi/Aqara (miIO protocol), Matter, and Yeelight devices.
+    """
+    from .smarthome import discover_all
+
+    methods_list = None if method == "all" else [method]
+    method_names = methods_list or ["miio", "mdns", "aqara", "matter"]
+
+    console.print(f"[bold]Discovering smart home devices ({method})...[/bold]")
+    if no_cache:
+        console.print("[dim]Cache bypassed[/dim]")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        # Show which methods we're scanning
+        task = progress.add_task(
+            f"Scanning: {', '.join(method_names)}...",
+            total=None,
+        )
+
+        try:
+            result = discover_all(
+                timeout=timeout,
+                methods=methods_list,
+                use_cache=not no_cache,
+            )
+            progress.update(task, completed=True)
+        except Exception as e:
+            print_error(str(e))
+            sys.exit(1)
+
+    if result.total_count == 0:
+        console.print("[yellow]No smart home devices discovered.[/yellow]")
+        return
+
+    # Display miIO devices
+    if result.miio_devices:
+        table = Table(title=f"miIO Devices ({len(result.miio_devices)})")
+        table.add_column("IP", style="cyan")
+        table.add_column("Device ID", style="green")
+        table.add_column("Model", style="yellow")
+        table.add_column("Token", style="magenta")
+        table.add_column("Firmware", style="dim")
+
+        for device in result.miio_devices:
+            # Consistent token format: first 6 + "..." + last 6
+            if device.token and len(device.token) > 12:
+                token_display = f"{device.token[:6]}...{device.token[-6:]}"
+            elif device.token:
+                token_display = device.token
+            else:
+                token_display = "[red]N/A[/red]"
+            table.add_row(
+                device.ip,
+                device.device_id or "-",
+                device.model or "-",
+                token_display,
+                device.firmware or "-",
+            )
+
+        console.print(table)
+
+    # Display Aqara gateways
+    if result.aqara_gateways:
+        table = Table(title=f"Aqara Gateways ({len(result.aqara_gateways)})")
+        table.add_column("IP", style="cyan")
+        table.add_column("SID", style="green")
+        table.add_column("Model", style="yellow")
+        table.add_column("Protocol", style="magenta")
+
+        for gateway in result.aqara_gateways:
+            table.add_row(
+                gateway.ip,
+                gateway.sid or "-",
+                gateway.model or "-",
+                gateway.proto_version or "-",
+            )
+
+        console.print(table)
+
+    # Display Matter devices
+    if result.matter_devices:
+        table = Table(title=f"Matter Devices ({len(result.matter_devices)})")
+        table.add_column("IP", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Port", style="yellow")
+        table.add_column("Vendor ID", style="magenta")
+
+        for device in result.matter_devices:
+            table.add_row(
+                device.ip,
+                device.name or "-",
+                str(device.port) if device.port else "-",
+                str(device.vendor_id) if device.vendor_id else "-",
+            )
+
+        console.print(table)
+
+    # Summary
+    console.print(
+        Panel(
+            f"[green]Total: {result.total_count}[/green] | "
+            f"miIO: {len(result.miio_devices)} | "
+            f"Aqara: {len(result.aqara_gateways)} | "
+            f"Matter: {len(result.matter_devices)}",
+            title="Discovery Summary",
+        )
+    )
+
+    # Save to file if requested
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(result.to_dict(), f, indent=2)
+        print_success(f"Results saved to {output_path}")
+
+
+@smarthome.command("info")
+@click.argument("ip")
+@click.option("--token", "-t", required=True, help="Device token (32 hex characters)")
+def smarthome_info(ip: str, token: str) -> None:
+    """Get detailed information about a Xiaomi smart device.
+
+    Requires the device token which can be obtained from cloud-tokens command
+    or through local discovery on uninitialized devices.
+    """
+    from .smarthome import get_device_info, validate_token
+
+    if not validate_token(token):
+        print_error("Invalid token format. Token must be 32 hex characters.")
+        sys.exit(1)
+
+    console.print(f"[bold]Getting device info for {ip}...[/bold]")
+
+    try:
+        info = get_device_info(ip, token)
+
+        table = Table(title="Device Information")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("IP Address", info.ip)
+        table.add_row("Device ID", info.device_id or "-")
+        table.add_row("Model", info.model or "-")
+        table.add_row("Firmware", info.firmware or "-")
+        table.add_row("Hardware", info.hardware or "-")
+        table.add_row("MAC", info.mac or "-")
+
+        console.print(table)
+
+        if info.raw_info:
+            console.print(
+                Panel(json.dumps(info.raw_info, indent=2), title="Raw Info", border_style="dim")
+            )
+
+    except Exception as e:
+        print_error(str(e))
+        sys.exit(1)
+
+
+def _get_password_from_env_or_prompt() -> str:
+    """Get password from environment variable or prompt.
+
+    Environment variable: XIAOMI_PASSWORD
+    """
+    import os
+
+    password = os.environ.get("XIAOMI_PASSWORD")
+    if password:
+        console.print("[dim]Using password from XIAOMI_PASSWORD environment variable[/dim]")
+        return password
+    return click.prompt("Password", hide_input=True)
+
+
+@smarthome.command("cloud-tokens")
+@click.option(
+    "--username",
+    "-u",
+    envvar="XIAOMI_USERNAME",
+    required=True,
+    help="Xiaomi account email or phone (or XIAOMI_USERNAME env var)",
+)
+@click.option(
+    "--password",
+    "-p",
+    envvar="XIAOMI_PASSWORD",
+    help="Xiaomi account password (or XIAOMI_PASSWORD env var, or prompt)",
+)
+@click.option(
+    "--server",
+    "-s",
+    type=click.Choice(["cn", "de", "us", "ru", "tw", "sg", "in"]),
+    default="cn",
+    help="Cloud server region (default: cn)",
+)
+@click.option("--output", "-o", type=click.Path(), help="Output file (JSON)")
+@click.option("--show-full-tokens", is_flag=True, help="Show full tokens (not truncated)")
+def smarthome_cloud_tokens(
+    username: str, password: str | None, server: str, output: str | None, show_full_tokens: bool
+) -> None:
+    """Retrieve device tokens from Xiaomi Cloud account.
+
+    This command logs into your Xiaomi account and retrieves all registered
+    devices along with their tokens. Tokens are required to control devices locally.
+
+    Credentials can be provided via:
+      - Command line options (-u, -p)
+      - Environment variables (XIAOMI_USERNAME, XIAOMI_PASSWORD)
+      - Interactive prompt (password only)
+
+    Server regions:
+      cn - China, de - Europe, us - United States,
+      ru - Russia, tw - Taiwan, sg - Singapore, in - India
+    """
+    from .smarthome import fetch_cloud_tokens
+
+    # Get password if not provided
+    if password is None:
+        password = click.prompt("Password", hide_input=True)
+
+    console.print(f"[bold]Fetching devices from Xiaomi Cloud ({server})...[/bold]")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Authenticating...", total=None)
+
+        result = fetch_cloud_tokens(username, password, server)
+        progress.update(task, completed=True)
+
+    if not result.get("success"):
+        print_error(result.get("error", "Unknown error"))
+        sys.exit(1)
+
+    devices = result.get("devices", [])
+
+    if not devices:
+        console.print("[yellow]No devices found in cloud account.[/yellow]")
+        return
+
+    table = Table(title=f"Cloud Devices ({len(devices)})")
+    table.add_column("Name", style="cyan")
+    table.add_column("Model", style="green")
+    table.add_column("Device ID", style="yellow")
+    table.add_column("Token", style="magenta")
+    table.add_column("Local IP", style="dim")
+    table.add_column("Online", style="dim")
+
+    for device in devices:
+        token = device.get("token", "")
+        if show_full_tokens:
+            token_display = token
+        else:
+            # Consistent format: first 6 + "..." + last 6
+            token_display = f"{token[:6]}...{token[-6:]}" if len(token) > 12 else token
+        online = "[green]Yes[/green]" if device.get("is_online") else "[red]No[/red]"
+
+        table.add_row(
+            device.get("name") or "-",
+            device.get("model") or "-",
+            device.get("device_id") or "-",
+            token_display or "[red]N/A[/red]",
+            device.get("ip") or "-",
+            online,
+        )
+
+    console.print(table)
+
+    print_warning("Tokens are sensitive! Store them securely and don't share them.")
+
+    if output:
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(result, f, indent=2)
+        print_success(f"Results saved to {output_path}")
+
+
+@smarthome.command("check")
+@click.argument("ip")
+@click.option("--token", "-t", required=True, help="Device token (32 hex characters)")
+def smarthome_check(ip: str, token: str) -> None:
+    """Check connectivity to a smart device.
+
+    Verifies the device is reachable and the token is valid.
+    """
+    from .smarthome import check_device_connectivity, validate_token
+
+    if not validate_token(token):
+        print_error("Invalid token format. Token must be 32 hex characters.")
+        sys.exit(1)
+
+    console.print(f"[bold]Checking device at {ip}...[/bold]")
+
+    result = check_device_connectivity(ip, token)
+
+    if result.get("reachable"):
+        print_success("Device is reachable!")
+        console.print(f"  Model: {result.get('model', 'Unknown')}")
+        console.print(f"  Firmware: {result.get('firmware', 'Unknown')}")
+        console.print(f"  Device ID: {result.get('device_id', 'Unknown')}")
+    else:
+        print_error(f"Device not reachable: {result.get('error', 'Unknown error')}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

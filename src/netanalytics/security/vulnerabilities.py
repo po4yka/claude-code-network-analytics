@@ -166,12 +166,106 @@ class OpenDatabaseCheck(VulnerabilityCheck):
         return None
 
 
+class SmartHomeDeviceCheck(VulnerabilityCheck):
+    """Check for exposed smart home device ports."""
+
+    name = "Exposed Smart Home Device"
+    severity = "medium"
+
+    # Smart home ports and their associated risks
+    SMART_HOME_PORTS = {
+        54321: ("miIO (Xiaomi)", "Xiaomi devices may be controllable without authentication"),
+        9898: ("Aqara Gateway", "Aqara Zigbee gateway local API may be exposed"),
+        4480: ("Mi LED", "Xiaomi LED controller may be controllable"),
+        6668: ("Yeelight", "Yeelight device may be controllable without authentication"),
+        55443: ("Yeelight", "Yeelight device music mode may be controllable"),
+    }
+
+    def check(self, target: str, port: int, service_info: dict) -> VulnerabilityResult | None:
+        if port in self.SMART_HOME_PORTS:
+            protocol, risk = self.SMART_HOME_PORTS[port]
+            return VulnerabilityResult(
+                name=self.name,
+                severity=self.severity,
+                description=f"{protocol} port exposed on {port}. {risk}.",
+                port=port,
+                service=protocol.lower(),
+                remediation=(
+                    "Ensure smart home devices are on a separate VLAN/network segment. "
+                    "Use strong Wi-Fi passwords and disable unnecessary local APIs."
+                ),
+            )
+        return None
+
+
+class UninitializedSmartDeviceCheck(VulnerabilityCheck):
+    """Check for uninitialized smart home devices with exposed tokens."""
+
+    name = "Uninitialized Smart Device"
+    severity = "high"
+
+    def check(self, target: str, port: int, service_info: dict) -> VulnerabilityResult | None:
+        # This check is primarily for port 54321 (miIO)
+        if port != 54321:
+            return None
+
+        # Check if service info indicates an uninitialized device
+        # Uninitialized devices respond with a non-zero token in the hello response
+        banner = service_info.get("banner", "")
+        if banner and "token" in banner.lower() and "ffff" not in banner.lower():
+            return VulnerabilityResult(
+                name=self.name,
+                severity=self.severity,
+                description=(
+                    "Smart device appears uninitialized - token may be exposed. "
+                    "Uninitialized Xiaomi devices broadcast their tokens."
+                ),
+                port=port,
+                service="miio",
+                remediation=(
+                    "Complete device setup in the Mi Home app immediately. "
+                    "An attacker on the same network could extract the device token "
+                    "and take control of the device."
+                ),
+            )
+        return None
+
+
+class AqaraGatewayCheck(VulnerabilityCheck):
+    """Check for Aqara gateways with local API enabled."""
+
+    name = "Aqara Gateway Local API"
+    severity = "medium"
+
+    def check(self, target: str, port: int, service_info: dict) -> VulnerabilityResult | None:
+        if port != 9898:
+            return None
+
+        return VulnerabilityResult(
+            name=self.name,
+            severity=self.severity,
+            description=(
+                "Aqara gateway local API is accessible. "
+                "Local API allows controlling Zigbee devices without authentication."
+            ),
+            port=port,
+            service="aqara",
+            remediation=(
+                "If local API access is not needed, disable it in the Mi Home app. "
+                "Consider placing smart home devices on an isolated network segment."
+            ),
+        )
+
+
 # Registry of all checks
 VULNERABILITY_CHECKS = [
     DefaultCredentialsCheck(),
     UnencryptedServiceCheck(),
     OutdatedServiceCheck(),
     OpenDatabaseCheck(),
+    SmartHomeDeviceCheck(),
+    UninitializedSmartDeviceCheck(),
+    AqaraGatewayCheck(),
 ]
 
 
