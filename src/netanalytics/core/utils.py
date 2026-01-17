@@ -68,7 +68,10 @@ def elevate_privileges() -> bool:
 def validate_ip(ip_str: str) -> IPv4Address | IPv6Address:
     """Validate and parse an IP address string."""
     try:
-        return ip_address(ip_str)
+        ip = ip_address(ip_str)
+        if ip.version == 6:
+            raise ValidationError(f"IPv6 address not supported: {ip_str}")
+        return ip
     except ValueError as e:
         raise ValidationError(f"Invalid IP address: {ip_str}", str(e)) from e
 
@@ -89,7 +92,10 @@ def resolve_target(target: str) -> str:
 def validate_network(network_str: str) -> IPv4Network | IPv6Network:
     """Validate and parse a network CIDR string."""
     try:
-        return ip_network(network_str, strict=False)
+        net = ip_network(network_str, strict=False)
+        if net.version == 6:
+            raise ValidationError(f"IPv6 networks are not supported: {network_str}")
+        return net
     except ValueError as e:
         raise ValidationError(f"Invalid network: {network_str}", str(e)) from e
 

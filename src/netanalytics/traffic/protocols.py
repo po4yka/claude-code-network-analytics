@@ -1,11 +1,12 @@
 """Protocol-specific extraction and analysis."""
 
 from collections import defaultdict
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from scapy.all import DNS, IP, TCP, Raw, rdpcap
+from scapy.all import DNS, IP, TCP, Raw, PcapReader
 
 from ..core.exceptions import CaptureError
 
@@ -97,69 +98,68 @@ def extract_http(pcap_file: str) -> list[HTTPRequest]:
     if not Path(pcap_file).exists():
         raise CaptureError(f"Pcap file not found: {pcap_file}")
 
-    try:
-        packets = rdpcap(pcap_file)
-    except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
-
     requests = []
 
-    for packet in packets:
-        if not (packet.haslayer(TCP) and packet.haslayer(Raw) and packet.haslayer(IP)):
-            continue
+    try:
+        with closing(PcapReader(pcap_file)) as reader:
+            for packet in reader:
+                if not (packet.haslayer(TCP) and packet.haslayer(Raw) and packet.haslayer(IP)):
+                    continue
 
-        tcp = packet.getlayer(TCP)
-        ip = packet.getlayer(IP)
-        raw = packet.getlayer(Raw)
+                tcp = packet.getlayer(TCP)
+                ip = packet.getlayer(IP)
+                raw = packet.getlayer(Raw)
 
-        if tcp is None or ip is None or raw is None:
-            continue
+                if tcp is None or ip is None or raw is None:
+                    continue
 
-        if tcp.dport not in (80, 8080) and tcp.sport not in (80, 8080):
-            continue
+                if tcp.dport not in (80, 8080) and tcp.sport not in (80, 8080):
+                    continue
 
-        try:
-            payload = raw.load.decode("utf-8", errors="ignore")
-        except Exception:
-            continue
+                try:
+                    payload = raw.load.decode("utf-8", errors="ignore")
+                except Exception:
+                    continue
 
-        # Check if it's an HTTP request
-        http_methods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
-        if not any(payload.startswith(m) for m in http_methods):
-            continue
+                # Check if it's an HTTP request
+                http_methods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
+                if not any(payload.startswith(m) for m in http_methods):
+                    continue
 
-        lines = payload.split("\r\n")
-        if not lines:
-            continue
+                lines = payload.split("\r\n")
+                if not lines:
+                    continue
 
-        # Parse request line
-        request_line = lines[0].split(" ")
-        if len(request_line) < 2:
-            continue
+                # Parse request line
+                request_line = lines[0].split(" ")
+                if len(request_line) < 2:
+                    continue
 
-        method = request_line[0]
-        uri = request_line[1]
+                method = request_line[0]
+                uri = request_line[1]
 
-        # Parse headers
-        headers: dict[str, str] = {}
-        for line in lines[1:]:
-            if ": " in line:
-                key, value = line.split(": ", 1)
-                headers[key.lower()] = value
+                # Parse headers
+                headers: dict[str, str] = {}
+                for line in lines[1:]:
+                    if ": " in line:
+                        key, value = line.split(": ", 1)
+                        headers[key.lower()] = value
 
-        requests.append(
-            HTTPRequest(
-                src_ip=ip.src,
-                dst_ip=ip.dst,
-                src_port=tcp.sport,
-                dst_port=tcp.dport,
-                method=method,
-                uri=uri,
-                host=headers.get("host"),
-                user_agent=headers.get("user-agent"),
-                content_type=headers.get("content-type"),
-            )
-        )
+                requests.append(
+                    HTTPRequest(
+                        src_ip=ip.src,
+                        dst_ip=ip.dst,
+                        src_port=tcp.sport,
+                        dst_port=tcp.dport,
+                        method=method,
+                        uri=uri,
+                        host=headers.get("host"),
+                        user_agent=headers.get("user-agent"),
+                        content_type=headers.get("content-type"),
+                    )
+                )
+    except Exception as e:
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     return requests
 
@@ -176,11 +176,6 @@ def extract_dns(pcap_file: str) -> list[DNSQuery]:
     """
     if not Path(pcap_file).exists():
         raise CaptureError(f"Pcap file not found: {pcap_file}")
-
-    try:
-        packets = rdpcap(pcap_file)
-    except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     queries = []
     dns_cache = {}  # Track queries to match with responses
@@ -199,55 +194,59 @@ def extract_dns(pcap_file: str) -> list[DNSQuery]:
         255: "ANY",
     }
 
-    for packet in packets:
-        if not packet.haslayer(DNS) or not packet.haslayer(IP):
-            continue
+    try:
+        with closing(PcapReader(pcap_file)) as reader:
+            for packet in reader:
+                if not packet.haslayer(DNS) or not packet.haslayer(IP):
+                    continue
 
-        dns = packet.getlayer(DNS)
-        ip = packet.getlayer(IP)
+                dns = packet.getlayer(DNS)
+                ip = packet.getlayer(IP)
 
-        if dns is None or ip is None:
-            continue
+                if dns is None or ip is None:
+                    continue
 
-        # DNS Query
-        if dns.qr == 0 and dns.qd:
-            qname = dns.qd.qname.decode() if isinstance(dns.qd.qname, bytes) else str(dns.qd.qname)
-            qtype = dns_types.get(dns.qd.qtype, str(dns.qd.qtype))
+                # DNS Query
+                if dns.qr == 0 and dns.qd:
+                    qname = dns.qd.qname.decode() if isinstance(dns.qd.qname, bytes) else str(dns.qd.qname)
+                    qtype = dns_types.get(dns.qd.qtype, str(dns.qd.qtype))
 
-            # Store query for later matching
-            dns_cache[dns.id] = {
-                "src_ip": ip.src,
-                "dst_ip": ip.dst,
-                "query_name": qname.rstrip("."),
-                "query_type": qtype,
-            }
+                    # Store query for later matching
+                    dns_cache[dns.id] = {
+                        "src_ip": ip.src,
+                        "dst_ip": ip.dst,
+                        "query_name": qname.rstrip("."),
+                        "query_type": qtype,
+                    }
 
-        # DNS Response
-        elif dns.qr == 1 and dns.id in dns_cache:
-            query_info = dns_cache[dns.id]
-            answers = []
+                # DNS Response
+                elif dns.qr == 1 and dns.id in dns_cache:
+                    query_info = dns_cache[dns.id]
+                    answers = []
 
-            # Extract answers
-            for i in range(dns.ancount):
-                try:
-                    rr = dns.an[i]
-                    if hasattr(rr, "rdata"):
-                        rdata = rr.rdata
-                        if isinstance(rdata, bytes):
-                            rdata = rdata.decode("utf-8", errors="ignore")
-                        answers.append(str(rdata))
-                except Exception:
-                    pass
+                    # Extract answers
+                    for i in range(dns.ancount):
+                        try:
+                            rr = dns.an[i]
+                            if hasattr(rr, "rdata"):
+                                rdata = rr.rdata
+                                if isinstance(rdata, bytes):
+                                    rdata = rdata.decode("utf-8", errors="ignore")
+                                answers.append(str(rdata))
+                        except Exception:
+                            pass
 
-            queries.append(
-                DNSQuery(
-                    src_ip=query_info["src_ip"],
-                    dst_ip=query_info["dst_ip"],
-                    query_name=query_info["query_name"],
-                    query_type=query_info["query_type"],
-                    answers=answers,
-                )
-            )
+                    queries.append(
+                        DNSQuery(
+                            src_ip=query_info["src_ip"],
+                            dst_ip=query_info["dst_ip"],
+                            query_name=query_info["query_name"],
+                            query_type=query_info["query_type"],
+                            answers=answers,
+                        )
+                    )
+    except Exception as e:
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     return queries
 
@@ -266,11 +265,6 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
     if not Path(pcap_file).exists():
         raise CaptureError(f"Pcap file not found: {pcap_file}")
 
-    try:
-        packets = rdpcap(pcap_file)
-    except Exception as e:
-        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
-
     streams: defaultdict[tuple[str, int, str, int], dict[str, Any]] = defaultdict(
         lambda: {
             "packets": 0,
@@ -280,33 +274,37 @@ def extract_tcp_streams(pcap_file: str, max_streams: int = 100) -> list[TCPStrea
         }
     )
 
-    for packet in packets:
-        if not packet.haslayer(TCP) or not packet.haslayer(IP):
-            continue
+    try:
+        with closing(PcapReader(pcap_file)) as reader:
+            for packet in reader:
+                if not packet.haslayer(TCP) or not packet.haslayer(IP):
+                    continue
 
-        ip = packet.getlayer(IP)
-        tcp = packet.getlayer(TCP)
+                ip = packet.getlayer(IP)
+                tcp = packet.getlayer(TCP)
 
-        if ip is None or tcp is None:
-            continue
+                if ip is None or tcp is None:
+                    continue
 
-        # Create stream key (normalized)
-        endpoints = sorted([(ip.src, tcp.sport), (ip.dst, tcp.dport)])
-        stream_key = (endpoints[0][0], endpoints[0][1], endpoints[1][0], endpoints[1][1])
+                # Create stream key (normalized)
+                endpoints = sorted([(ip.src, tcp.sport), (ip.dst, tcp.dport)])
+                stream_key = (endpoints[0][0], endpoints[0][1], endpoints[1][0], endpoints[1][1])
 
-        streams[stream_key]["packets"] += 1
+                streams[stream_key]["packets"] += 1
 
-        # Track bytes
-        raw = packet.getlayer(Raw) if packet.haslayer(Raw) else None
-        payload_len = len(raw.load) if raw is not None else 0
-        if (ip.src, tcp.sport) == endpoints[0]:
-            streams[stream_key]["bytes_fwd"] += payload_len
-        else:
-            streams[stream_key]["bytes_rev"] += payload_len
+                # Track bytes
+                raw = packet.getlayer(Raw) if packet.haslayer(Raw) else None
+                payload_len = len(raw.load) if raw is not None else 0
+                if (ip.src, tcp.sport) == endpoints[0]:
+                    streams[stream_key]["bytes_fwd"] += payload_len
+                else:
+                    streams[stream_key]["bytes_rev"] += payload_len
 
-        # Capture some data for preview
-        if raw is not None and len(streams[stream_key]["data"]) < 500:
-            streams[stream_key]["data"] += raw.load[:100]
+                # Capture some data for preview
+                if raw is not None and len(streams[stream_key]["data"]) < 500:
+                    streams[stream_key]["data"] += raw.load[:100]
+    except Exception as e:
+        raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
     # Convert to TCPStream objects
     result = []

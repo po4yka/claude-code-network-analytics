@@ -1,10 +1,11 @@
 """Report generation functionality."""
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
 
 from ..core.utils import ensure_results_dir
 
@@ -276,7 +277,14 @@ class ReportGenerator:
 
     def generate_html(self, output_file: str | None = None) -> str:
         """Generate HTML report."""
-        template = Template(HTML_TEMPLATE)
+        env = Environment(
+            autoescape=select_autoescape(
+                enabled_extensions=("html", "htm", "xml"),
+                default=True,
+                default_for_string=True,
+            )
+        )
+        template = env.from_string(HTML_TEMPLATE)
         html = template.render(**self.data)
 
         if output_file:
@@ -288,7 +296,8 @@ class ReportGenerator:
 
     def generate_markdown(self, output_file: str | None = None) -> str:
         """Generate Markdown report."""
-        template = Template(MARKDOWN_TEMPLATE)
+        # Keep Markdown unescaped to preserve formatting; HTML is handled separately with autoescape.
+        template = Environment(autoescape=False).from_string(MARKDOWN_TEMPLATE)
         md = template.render(**self.data)
 
         if output_file:
@@ -340,7 +349,8 @@ def generate_report(
         results_dir = ensure_results_dir()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         ext = {"html": "html", "md": "md", "json": "json"}[output_format]
-        output_file = str(results_dir / f"report_{target}_{timestamp}.{ext}")
+        safe_target = _safe_target_slug(target)
+        output_file = str(results_dir / f"report_{safe_target}_{timestamp}.{ext}")
 
     # Generate report
     if output_format == "html":
@@ -351,3 +361,15 @@ def generate_report(
         generator.generate_json(output_file)
 
     return output_file
+
+
+_SAFE_TARGET_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]")
+
+
+def _safe_target_slug(target: str) -> str:
+    """Sanitize target string for filesystem-safe report names."""
+    slug = _SAFE_TARGET_PATTERN.sub("_", target)
+    slug = slug.strip("._")
+    if not slug:
+        slug = "target"
+    return slug

@@ -1,10 +1,11 @@
 """Traffic analysis and statistics."""
 
 from collections import Counter, defaultdict
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from scapy.all import DNS, ICMP, IP, TCP, UDP, rdpcap
+from scapy.all import DNS, ICMP, IP, TCP, UDP, PcapReader
 
 from ..core.exceptions import CaptureError
 
@@ -71,7 +72,7 @@ class ProtocolAnalyzer:
     """Analyze network traffic protocols."""
 
     def __init__(self):
-        self.packets = []
+        self.packet_count = 0
         self.protocols = Counter()
         self.sources = Counter()
         self.destinations = Counter()
@@ -84,8 +85,9 @@ class ProtocolAnalyzer:
 
     def add_packet(self, packet) -> None:
         """Add a packet to analysis."""
-        self.packets.append(packet)
-        self.total_bytes += len(packet)
+        self.packet_count += 1
+        packet_len = len(packet)
+        self.total_bytes += packet_len
 
         # Track time
         pkt_time = float(packet.time)
@@ -154,14 +156,14 @@ class ProtocolAnalyzer:
         ]
 
         return TrafficStats(
-            total_packets=len(self.packets),
+            total_packets=self.packet_count,
             total_bytes=self.total_bytes,
             duration_seconds=duration,
             protocols=dict(self.protocols),
             top_sources=self.sources.most_common(10),
             top_destinations=self.destinations.most_common(10),
             top_ports=self.ports.most_common(10),
-            packets_per_second=len(self.packets) / duration,
+            packets_per_second=self.packet_count / duration,
             bytes_per_second=self.total_bytes / duration,
             tcp_flags=dict(self.tcp_flags),
             conversations=conversations_list,
@@ -185,24 +187,30 @@ def analyze_pcap(
     if not Path(pcap_file).exists():
         raise CaptureError(f"Pcap file not found: {pcap_file}")
 
+    analyzer = ProtocolAnalyzer()
+
     try:
-        packets = rdpcap(pcap_file)
+        with closing(PcapReader(pcap_file)) as reader:
+            for packet in reader:
+                # Apply protocol filter
+                if protocol_filter == "tcp" and not packet.haslayer(TCP):
+                    continue
+                if protocol_filter == "udp" and not packet.haslayer(UDP):
+                    continue
+                if protocol_filter == "http":
+                    if not packet.haslayer(TCP):
+                        continue
+                    http_ports = (80, 443)
+                    if packet.sport not in http_ports and packet.dport not in http_ports:
+                        continue
+                if protocol_filter == "dns" and not packet.haslayer(DNS):
+                    continue
+
+                analyzer.add_packet(packet)
     except Exception as e:
         raise CaptureError(f"Failed to read pcap file: {pcap_file}", str(e)) from e
 
-    analyzer = ProtocolAnalyzer()
-
-    for packet in packets:
-        # Apply protocol filter
-        if protocol_filter == "tcp" and not packet.haslayer(TCP):
-            continue
-        if protocol_filter == "udp" and not packet.haslayer(UDP):
-            continue
-        if protocol_filter == "http":
-            if not packet.haslayer(TCP):
-                continue
-            http_ports = (80, 443)
-            if packet.sport not in http_ports and packet.dport not in http_ports:
+    return analyzer.get_stats()
                 continue
         if protocol_filter == "dns" and not packet.haslayer(DNS):
             continue
