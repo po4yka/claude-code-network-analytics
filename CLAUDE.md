@@ -107,7 +107,7 @@ src/netanalytics/
 ├── topology/           # NetworkX graphs
 ├── traffic/            # Packet capture/analysis
 ├── security/           # Vulnerability checks
-├── wrappers/           # nmap, tshark, ncat
+├── wrappers/           # nmap, tshark, ncat, mtr, tcpdump, bandwidth, iperf3
 └── output/             # Reports, export
 
 mcp/
@@ -153,6 +153,23 @@ The toolkit exposes an MCP server for AI-native integration.
 | `analyze_security_risks` | Risk analysis | No |
 | `create_network_report` | Generate reports | No |
 | `list_network_interfaces` | List interfaces | No |
+| `trace_network_path` | mtr path tracing with latency/loss | Yes |
+| `quick_path_trace` | Fast 3-probe path trace | Yes |
+| `analyze_path_quality` | Detailed path quality analysis | Yes |
+| `tcpdump_capture` | Lightweight packet capture | Yes |
+| `tcpdump_read_pcap` | Read pcap with tcpdump | No |
+| `ngrep_search_pcap` | Search patterns in pcap | No |
+| `ngrep_search_live` | Search patterns in live traffic | Yes |
+| `tcpflow_extract_streams` | Extract TCP streams from pcap | No |
+| `monitor_bandwidth` | Per-process bandwidth (bandwhich) | Yes |
+| `get_traffic_stats` | Historical traffic stats (vnstat) | No |
+| `check_vnstat_status` | Check vnstat daemon status | No |
+| `compare_interface_traffic` | Compare traffic across interfaces | No |
+| `benchmark_throughput` | iperf3 throughput test | No |
+| `quick_speed_test` | Quick 5-second upload test | No |
+| `test_download_speed` | Download speed test | No |
+| `test_bidirectional_throughput` | Bidirectional speed test | No |
+| `test_udp_jitter` | UDP jitter/packet loss test | No |
 
 ### MCP Resources
 
